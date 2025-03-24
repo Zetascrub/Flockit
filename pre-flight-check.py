@@ -441,6 +441,8 @@ def main():
     global PROJECT_FOLDER
     smb_server = "IP"
     smb_share = "NAME"
+    smb_user = "USER"
+    smb_pass = "PASS"
     parser = argparse.ArgumentParser(
         description="Integrated PenTest Pre-Flight Check Tool with Custom Settings, XML Output, and Summary"
     )
@@ -469,7 +471,7 @@ def main():
     if upload_choice == 'y':
         # Build the remote path based on the actual project folder name.
         remote_path = os.path.join("Projects", os.path.basename(PROJECT_FOLDER))
-        upload_project_to_smb_impacket(PROJECT_FOLDER, smb_server, smb_share, remote_path, "", "")
+        upload_project_to_smb_impacket(PROJECT_FOLDER, smb_server, smb_share, remote_path, smb_user, smb_pass)
 
 
 if __name__ == "__main__":
