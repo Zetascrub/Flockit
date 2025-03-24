@@ -6,9 +6,9 @@ This project provides an pre-flight check tool for penetration testing, written 
 
 - **Scope Splitting**
   - Reads a `scope.txt` file and splits its contents into:
-    - `int_scope.txt` for internal IP addresses/CIDR ranges.
-    - `ext_scope.txt` for external IP addresses/CIDR ranges.
-    - `web_scope.txt` for website URLs.
+  - `int_scope.txt` for internal IP addresses/CIDR ranges.
+  - `ext_scope.txt` for external IP addresses/CIDR ranges.
+  - `web_scope.txt` for website URLs.
 - **IP Range Expansion**
   - Supports expanding IP ranges expressed as `192.168.8.10-100` (last octet ranges).
 - **Bare Domain Handling**
@@ -50,6 +50,7 @@ Usage
 3. Run the Script
     
     Execute the script:
+
     ```bash
     python preflight_checks.py
     ```
@@ -60,9 +61,9 @@ Optional Custom Settings
 
 Provide a custom settings XML file using the -s flag:
 
-    ```bash
-    python preflight_checks.py -s path/to/settings.xml
-    ```
+```bash
+python preflight_checks.py -s path/to/settings.xml
+```
 
 ## Script Process
 
