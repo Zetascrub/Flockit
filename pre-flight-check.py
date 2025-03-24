@@ -98,7 +98,6 @@ def expand_ip_range(entry):
         base = match.group(1)
         start = int(match.group(2))
         end = int(match.group(3))
-        # Ensure valid range: start should be <= end and within 0-255
         if 0 <= start <= end <= 255:
             return [f"{base}{i}" for i in range(start, end + 1)]
     return [entry]
@@ -108,7 +107,6 @@ def is_domain(entry):
     Check if the entry looks like a domain without a protocol.
     Returns True if it's a domain.
     """
-    # Basic regex to detect domain names (e.g. example.com, sub.example.co.uk)
     if re.match(r"^(?!http://|https://)[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", entry):
         return True
     return False
@@ -141,7 +139,6 @@ Example.com
     with open(MAIN_SCOPE_FILE, "r") as f:
         raw_entries = [line.strip() for line in f if line.strip()]
 
-    # Define internal IP ranges
     internal_networks = [
         ipaddress.ip_network("10.0.0.0/8"),
         ipaddress.ip_network("172.16.0.0/12"),
@@ -160,11 +157,10 @@ Example.com
     web_entries = []
 
     for entry in raw_entries:
-        # Check if the entry is an IP range (e.g. "192.168.8.10-100")
-        if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}-\d{1,3}$", entry) or re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}-\d{1,3}$", entry) or "-" in entry:
+        # Check if the entry is an IP range
+        if "-" in entry and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}-\d{1,3}$", entry):
             expanded = expand_ip_range(entry)
             for ip in expanded:
-                # Validate the expanded IP address
                 try:
                     ipaddress.ip_address(ip)
                     if is_internal_ip(ip):
@@ -173,30 +169,27 @@ Example.com
                         ext_entries.append(ip)
                 except ValueError:
                     continue
-        # Check if it's a valid IP or CIDR notation
         else:
+            # Try to see if it's an IP or CIDR
             try:
                 ipaddress.ip_network(entry, strict=False)
-                # It's an IP or CIDR; decide internal/external.
                 if is_internal_ip(entry):
                     int_entries.append(entry)
                 else:
                     ext_entries.append(entry)
-                continue  # processed entry
+                continue
             except ValueError:
                 pass
 
-            # Check if it's a URL (starting with http:// or https://)
+            # Check if it's a URL (with protocol)
             if re.match(r"^https?://", entry):
                 web_entries.append(entry)
             # Check if it's a bare domain; if so, prepend http://
             elif is_domain(entry):
                 web_entries.append("http://" + entry)
             else:
-                # If entry doesn't match anything, ignore or log a warning.
                 print(colored(f"[-] Unrecognized scope entry format: {entry}", "red"))
     
-    # Write entries to their respective files if lists are non-empty.
     if int_entries:
         with open(INT_SCOPE_FILE, "w") as f:
             for line in int_entries:
@@ -333,6 +326,33 @@ def write_xml_output():
         f.write(pretty_xml)
     print(colored(f"Scan results written to {xml_file}", "cyan"))
 
+def print_summary():
+    """
+    Print a summary table of the scan results.
+    For each target, display the host and its status.
+    For IPs: "Responded" if any open ports were found, otherwise "Not Responded".
+    For URLs: simply mark as "URL Scanned".
+    """
+    print("\n" + "=" * 50)
+    print("Summary:")
+    print("{:<20} | {:<30}".format("Host", "Status"))
+    print("-" * 50)
+    for mode, results in SCAN_RESULTS.items():
+        for entry in results:
+            if "target" in entry:
+                host = entry["target"]
+                if "[IP]" in entry["tag"]:
+                    if entry.get("open_ports") and len(entry["open_ports"]) > 0:
+                        status = "Responded (ports: " + ", ".join(str(p) for p in entry["open_ports"]) + ")"
+                    else:
+                        status = "Not Responded"
+                elif "[URL]" in entry["tag"]:
+                    status = "URL Scanned"
+                else:
+                    status = "Unknown"
+                print("{:<20} | {:<30}".format(host, status))
+    print("=" * 50)
+
 def create_project_structure(proj_number):
     """
     Create a project folder named after the project number (or PR00000 by default)
@@ -356,7 +376,7 @@ def create_project_structure(proj_number):
 def main():
     global PROJECT_FOLDER
     parser = argparse.ArgumentParser(
-        description="Integrated PenTest Pre-Flight Check Tool with Custom Settings and XML Output"
+        description="Integrated PenTest Pre-Flight Check Tool with Custom Settings, XML Output, and Summary"
     )
     parser.add_argument("-s", "--settings", help="Path to an XML file for custom settings")
     args = parser.parse_args()
@@ -376,6 +396,7 @@ def main():
     run_checks("web", web_scope_path)
     if CUSTOM_SETTINGS.get("output_format") == "XML":
         write_xml_output()
+    print_summary()
 
 if __name__ == "__main__":
     main()

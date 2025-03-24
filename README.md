@@ -2,6 +2,108 @@
 
 This project provides an pre-flight check tool for penetration testing, written in Python. It reads a single `scope.txt` file, automatically splits it into internal, external, and web scope files, and then runs various pre-flight checks (e.g. port scanning, external IP retrieval). It also supports custom settings via an XML file and outputs the scan results in XML format.
 
+
+## Demo
+
+```bash
+python3 pre-flight-check_0.2.py 
+Enter Project Number (or press Enter to use default PR00000): 
+Created project folder: PR00000
+Created folder: PR00000/Screenshots
+Created folder: PR00000/Scan-Data
+Created int_scope.txt with 11 entries (Internal IPs).
+No external IPs found; ext_scope.txt not created.
+No website URLs found; web_scope.txt not created.
+[*] Running pre-flight checks for: INT
+[~] 192.168.8.1 [IP]
+[2025-03-24 10:14:59] Tagged scope entry: 192.168.8.1 [IP]
+[*] Scanning common ports on 192.168.8.1...
+[+] Open ports on 192.168.8.1: [22, 80, 443]
+[2025-03-24 10:14:59] Open ports on 192.168.8.1: [22, 80, 443]
+[~] 192.168.8.2 [IP]
+[2025-03-24 10:14:59] Tagged scope entry: 192.168.8.2 [IP]
+[*] Scanning common ports on 192.168.8.2...
+[-] No common ports open on 192.168.8.2
+[2025-03-24 10:15:02] No common ports open on 192.168.8.2
+[~] 192.168.8.3 [IP]
+[2025-03-24 10:15:02] Tagged scope entry: 192.168.8.3 [IP]
+[*] Scanning common ports on 192.168.8.3...
+[-] No common ports open on 192.168.8.3
+[2025-03-24 10:15:04] No common ports open on 192.168.8.3
+[~] 192.168.8.4 [IP]
+[2025-03-24 10:15:04] Tagged scope entry: 192.168.8.4 [IP]
+[*] Scanning common ports on 192.168.8.4...
+[-] No common ports open on 192.168.8.4
+[2025-03-24 10:15:07] No common ports open on 192.168.8.4
+[~] 192.168.8.5 [IP]
+[2025-03-24 10:15:07] Tagged scope entry: 192.168.8.5 [IP]
+[*] Scanning common ports on 192.168.8.5...
+[-] No common ports open on 192.168.8.5
+[2025-03-24 10:15:10] No common ports open on 192.168.8.5
+[~] 192.168.8.6 [IP]
+[2025-03-24 10:15:10] Tagged scope entry: 192.168.8.6 [IP]
+[*] Scanning common ports on 192.168.8.6...
+[-] No common ports open on 192.168.8.6
+[2025-03-24 10:15:12] No common ports open on 192.168.8.6
+[~] 192.168.8.7 [IP]
+[2025-03-24 10:15:12] Tagged scope entry: 192.168.8.7 [IP]
+[*] Scanning common ports on 192.168.8.7...
+[-] No common ports open on 192.168.8.7
+[2025-03-24 10:15:15] No common ports open on 192.168.8.7
+[~] 192.168.8.8 [IP]
+[2025-03-24 10:15:15] Tagged scope entry: 192.168.8.8 [IP]
+[*] Scanning common ports on 192.168.8.8...
+[-] No common ports open on 192.168.8.8
+[2025-03-24 10:15:17] No common ports open on 192.168.8.8
+[~] 192.168.8.9 [IP]
+[2025-03-24 10:15:17] Tagged scope entry: 192.168.8.9 [IP]
+[*] Scanning common ports on 192.168.8.9...
+[-] No common ports open on 192.168.8.9
+[2025-03-24 10:15:20] No common ports open on 192.168.8.9
+[~] 192.168.8.10 [IP]
+[2025-03-24 10:15:20] Tagged scope entry: 192.168.8.10 [IP]
+[*] Scanning common ports on 192.168.8.10...
+[+] Open ports on 192.168.8.10: [445]
+[2025-03-24 10:15:22] Open ports on 192.168.8.10: [445]
+[~] 192.168.8.239 [IP]
+[2025-03-24 10:15:22] Tagged scope entry: 192.168.8.239 [IP]
+[*] Scanning common ports on 192.168.8.239...
+[+] Open ports on 192.168.8.239: [80, 443, 445]
+[2025-03-24 10:15:22] Open ports on 192.168.8.239: [80, 443, 445]
+[+] INT pre-flight checks passed.
+
+[2025-03-24 10:15:22] INT pre-flight checks passed.
+[*] Running pre-flight checks for: EXT
+[+] External IP Address: 82.147.10.194
+[2025-03-24 10:15:22] External IP Address: 82.147.10.194
+[-] ext_scope.txt not found.
+[2025-03-24 10:15:22] ext_scope.txt not found.
+[-] Skipping EXT checks due to no entries.
+[*] Running pre-flight checks for: WEB
+[+] External IP Address: 82.147.10.194
+[2025-03-24 10:15:22] External IP Address: 82.147.10.194
+[-] web_scope.txt not found.
+[2025-03-24 10:15:22] web_scope.txt not found.
+[-] Skipping WEB checks due to no entries.
+Scan results written to PR00000/scan_results.xml
+
+==================================================
+Summary:
+Host                 | Status                        
+--------------------------------------------------
+192.168.8.1          | Responded (ports: 22, 80, 443)
+192.168.8.2          | Not Responded                 
+192.168.8.3          | Not Responded                 
+192.168.8.4          | Not Responded                 
+192.168.8.5          | Not Responded                 
+192.168.8.6          | Not Responded                 
+192.168.8.7          | Not Responded                 
+192.168.8.8          | Not Responded                 
+192.168.8.9          | Not Responded                 
+192.168.8.10         | Responded (ports: 445)        
+192.168.8.239        | Responded (ports: 80, 443, 445)
+```
+
 ## Features
 
 - **Scope Splitting**
