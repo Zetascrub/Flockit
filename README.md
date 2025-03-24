@@ -16,74 +16,74 @@ No external IPs found; ext_scope.txt not created.
 No website URLs found; web_scope.txt not created.
 [*] Running pre-flight checks for: INT
 [~] 192.168.8.1 [IP]
-[2025-03-24 10:14:59] Tagged scope entry: 192.168.8.1 [IP]
+[2025-03-24 11:43:37] Tagged scope entry: 192.168.8.1 [IP]
 [*] Scanning common ports on 192.168.8.1...
 [+] Open ports on 192.168.8.1: [22, 80, 443]
-[2025-03-24 10:14:59] Open ports on 192.168.8.1: [22, 80, 443]
+[2025-03-24 11:43:37] Open ports on 192.168.8.1: [22, 80, 443]
 [~] 192.168.8.2 [IP]
-[2025-03-24 10:14:59] Tagged scope entry: 192.168.8.2 [IP]
+[2025-03-24 11:43:37] Tagged scope entry: 192.168.8.2 [IP]
 [*] Scanning common ports on 192.168.8.2...
 [-] No common ports open on 192.168.8.2
-[2025-03-24 10:15:02] No common ports open on 192.168.8.2
+[2025-03-24 11:43:39] No common ports open on 192.168.8.2
 [~] 192.168.8.3 [IP]
-[2025-03-24 10:15:02] Tagged scope entry: 192.168.8.3 [IP]
+[2025-03-24 11:43:39] Tagged scope entry: 192.168.8.3 [IP]
 [*] Scanning common ports on 192.168.8.3...
 [-] No common ports open on 192.168.8.3
-[2025-03-24 10:15:04] No common ports open on 192.168.8.3
+[2025-03-24 11:43:42] No common ports open on 192.168.8.3
 [~] 192.168.8.4 [IP]
-[2025-03-24 10:15:04] Tagged scope entry: 192.168.8.4 [IP]
+[2025-03-24 11:43:42] Tagged scope entry: 192.168.8.4 [IP]
 [*] Scanning common ports on 192.168.8.4...
 [-] No common ports open on 192.168.8.4
-[2025-03-24 10:15:07] No common ports open on 192.168.8.4
+[2025-03-24 11:43:44] No common ports open on 192.168.8.4
 [~] 192.168.8.5 [IP]
-[2025-03-24 10:15:07] Tagged scope entry: 192.168.8.5 [IP]
+[2025-03-24 11:43:44] Tagged scope entry: 192.168.8.5 [IP]
 [*] Scanning common ports on 192.168.8.5...
 [-] No common ports open on 192.168.8.5
-[2025-03-24 10:15:10] No common ports open on 192.168.8.5
+[2025-03-24 11:43:47] No common ports open on 192.168.8.5
 [~] 192.168.8.6 [IP]
-[2025-03-24 10:15:10] Tagged scope entry: 192.168.8.6 [IP]
+[2025-03-24 11:43:47] Tagged scope entry: 192.168.8.6 [IP]
 [*] Scanning common ports on 192.168.8.6...
 [-] No common ports open on 192.168.8.6
-[2025-03-24 10:15:12] No common ports open on 192.168.8.6
+[2025-03-24 11:43:49] No common ports open on 192.168.8.6
 [~] 192.168.8.7 [IP]
-[2025-03-24 10:15:12] Tagged scope entry: 192.168.8.7 [IP]
+[2025-03-24 11:43:49] Tagged scope entry: 192.168.8.7 [IP]
 [*] Scanning common ports on 192.168.8.7...
 [-] No common ports open on 192.168.8.7
-[2025-03-24 10:15:15] No common ports open on 192.168.8.7
+[2025-03-24 11:43:52] No common ports open on 192.168.8.7
 [~] 192.168.8.8 [IP]
-[2025-03-24 10:15:15] Tagged scope entry: 192.168.8.8 [IP]
+[2025-03-24 11:43:52] Tagged scope entry: 192.168.8.8 [IP]
 [*] Scanning common ports on 192.168.8.8...
 [-] No common ports open on 192.168.8.8
-[2025-03-24 10:15:17] No common ports open on 192.168.8.8
+[2025-03-24 11:43:54] No common ports open on 192.168.8.8
 [~] 192.168.8.9 [IP]
-[2025-03-24 10:15:17] Tagged scope entry: 192.168.8.9 [IP]
+[2025-03-24 11:43:54] Tagged scope entry: 192.168.8.9 [IP]
 [*] Scanning common ports on 192.168.8.9...
 [-] No common ports open on 192.168.8.9
-[2025-03-24 10:15:20] No common ports open on 192.168.8.9
+[2025-03-24 11:43:57] No common ports open on 192.168.8.9
 [~] 192.168.8.10 [IP]
-[2025-03-24 10:15:20] Tagged scope entry: 192.168.8.10 [IP]
+[2025-03-24 11:43:57] Tagged scope entry: 192.168.8.10 [IP]
 [*] Scanning common ports on 192.168.8.10...
 [+] Open ports on 192.168.8.10: [445]
-[2025-03-24 10:15:22] Open ports on 192.168.8.10: [445]
+[2025-03-24 11:43:59] Open ports on 192.168.8.10: [445]
 [~] 192.168.8.239 [IP]
-[2025-03-24 10:15:22] Tagged scope entry: 192.168.8.239 [IP]
+[2025-03-24 11:43:59] Tagged scope entry: 192.168.8.239 [IP]
 [*] Scanning common ports on 192.168.8.239...
 [+] Open ports on 192.168.8.239: [80, 443, 445]
-[2025-03-24 10:15:22] Open ports on 192.168.8.239: [80, 443, 445]
+[2025-03-24 11:43:59] Open ports on 192.168.8.239: [80, 443, 445]
 [+] INT pre-flight checks passed.
 
-[2025-03-24 10:15:22] INT pre-flight checks passed.
+[2025-03-24 11:43:59] INT pre-flight checks passed.
 [*] Running pre-flight checks for: EXT
 [+] External IP Address: 82.147.10.194
-[2025-03-24 10:15:22] External IP Address: 82.147.10.194
+[2025-03-24 11:43:59] External IP Address: 82.147.10.194
 [-] ext_scope.txt not found.
-[2025-03-24 10:15:22] ext_scope.txt not found.
+[2025-03-24 11:43:59] ext_scope.txt not found.
 [-] Skipping EXT checks due to no entries.
 [*] Running pre-flight checks for: WEB
 [+] External IP Address: 82.147.10.194
-[2025-03-24 10:15:22] External IP Address: 82.147.10.194
+[2025-03-24 11:43:59] External IP Address: 82.147.10.194
 [-] web_scope.txt not found.
-[2025-03-24 10:15:22] web_scope.txt not found.
+[2025-03-24 11:43:59] web_scope.txt not found.
 [-] Skipping WEB checks due to no entries.
 Scan results written to PR00000/scan_results.xml
 
@@ -102,6 +102,16 @@ Host                 | Status
 192.168.8.9          | Not Responded                 
 192.168.8.10         | Responded (ports: 445)        
 192.168.8.239        | Responded (ports: 80, 443, 445)
+==================================================
+Summary written to PR00000/summary.txt
+Do you want to upload the project folder to an SMB share? (y/n): y
+Connected to 192.168.8.239 on share Media
+Uploading PR00000/preflight_log.txt to Projects/PR00000/preflight_log.txt...
+Uploading PR00000/summary.txt to Projects/PR00000/summary.txt...
+Uploading PR00000/scan_results.xml to Projects/PR00000/scan_results.xml...
+Uploading PR00000/int_scope.txt to Projects/PR00000/int_scope.txt...
+Upload completed successfully.
+
 ```
 
 ## Features
@@ -127,6 +137,8 @@ Host                 | Status
   - Prompts for a project number (default: `PR00000`) and creates a folder with subfolders for Screenshots and Scan-Data.
 - **Logging**
   - Generates a log file (`preflight_log.txt`) with timestamped events inside the project folder.
+- **SMB Upload**
+  - Exports the files to a smb share.
 
 ## Requirements
 

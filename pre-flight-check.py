@@ -10,6 +10,7 @@ from termcolor import colored
 import xml.etree.ElementTree as ET
 import xml.dom.minidom as md
 import argparse
+from impacket.smbconnection import SMBConnection
 
 # Global variables for custom settings and scan results
 CUSTOM_SETTINGS = {
@@ -328,15 +329,17 @@ def write_xml_output():
 
 def print_summary():
     """
-    Print a summary table of the scan results.
+    Print a summary table of the scan results and write it to a summary.txt file.
     For each target, display the host and its status.
     For IPs: "Responded" if any open ports were found, otherwise "Not Responded".
     For URLs: simply mark as "URL Scanned".
     """
-    print("\n" + "=" * 50)
-    print("Summary:")
-    print("{:<20} | {:<30}".format("Host", "Status"))
-    print("-" * 50)
+    summary_lines = []
+    summary_lines.append("=" * 50)
+    summary_lines.append("Summary:")
+    summary_lines.append("{:<20} | {:<30}".format("Host", "Status"))
+    summary_lines.append("-" * 50)
+    
     for mode, results in SCAN_RESULTS.items():
         for entry in results:
             if "target" in entry:
@@ -350,8 +353,22 @@ def print_summary():
                     status = "URL Scanned"
                 else:
                     status = "Unknown"
-                print("{:<20} | {:<30}".format(host, status))
-    print("=" * 50)
+                summary_lines.append("{:<20} | {:<30}".format(host, status))
+    summary_lines.append("=" * 50)
+    summary_str = "\n".join(summary_lines)
+    
+    # Print summary to the terminal
+    print("\n" + summary_str)
+    
+    # Write summary to summary.txt in the project folder
+    summary_file = os.path.join(PROJECT_FOLDER, "summary.txt")
+    try:
+        with open(summary_file, "w") as f:
+            f.write(summary_str)
+        print(colored(f"Summary written to {summary_file}", "cyan"))
+    except Exception as e:
+        print(colored(f"[-] Failed to write summary: {e}", "red"))
+
 
 def create_project_structure(proj_number):
     """
@@ -373,8 +390,57 @@ def create_project_structure(proj_number):
             print(f"Folder '{sub_path}' already exists.")
     return base_folder
 
+
+
+def ensure_remote_path(conn, share, remote_path):
+    """
+    Ensure that the full remote_path exists on the SMB share.
+    Splits the path into parts and creates each directory if needed.
+    """
+    # Remove any leading/trailing slashes and split the path
+    parts = remote_path.strip("/").split("/")
+    current_path = ""
+    for part in parts:
+        current_path = current_path + "/" + part if current_path else part
+        try:
+            conn.createDirectory(share, current_path)
+        except Exception as e:
+            # Directory likely already exists, so ignore errors
+            pass
+
+
+def upload_project_to_smb_impacket(project_folder, smb_server, share_name, remote_path, username, password, domain=""):
+    try:
+        from impacket.smbconnection import SMBConnection
+        # Establish the connection; Impacket will negotiate SMB2/3 automatically.
+        conn = SMBConnection(smb_server, smb_server)
+        conn.login(username, password, domain)
+        print(f"Connected to {smb_server} on share {share_name}")
+
+        # Ensure remote directory exists
+        ensure_remote_path(conn, share_name, remote_path)
+
+        # Walk through the project folder and upload each file.
+        for root, dirs, files in os.walk(project_folder):
+            for file in files:
+                local_file = os.path.join(root, file)
+                # Create a remote path relative to the project folder.
+                rel_path = os.path.relpath(local_file, project_folder)
+                remote_file = os.path.join(remote_path, rel_path).replace("\\", "/")
+                print(f"Uploading {local_file} to {remote_file}...")
+                with open(local_file, 'rb') as fp:
+                    conn.putFile(share_name, remote_file, fp.read)
+        conn.logoff()
+        print("Upload completed successfully.")
+    except Exception as e:
+        print("Upload failed:", e)
+
+
+
 def main():
     global PROJECT_FOLDER
+    smb_server = "IP"
+    smb_share = "NAME"
     parser = argparse.ArgumentParser(
         description="Integrated PenTest Pre-Flight Check Tool with Custom Settings, XML Output, and Summary"
     )
@@ -397,6 +463,14 @@ def main():
     if CUSTOM_SETTINGS.get("output_format") == "XML":
         write_xml_output()
     print_summary()
+    
+    # Prompt user for SMB upload
+    upload_choice = input("Do you want to upload the project folder to an SMB share? (y/n): ").strip().lower()
+    if upload_choice == 'y':
+        # Build the remote path based on the actual project folder name.
+        remote_path = os.path.join("Projects", os.path.basename(PROJECT_FOLDER))
+        upload_project_to_smb_impacket(PROJECT_FOLDER, smb_server, smb_share, remote_path, "", "")
+
 
 if __name__ == "__main__":
     main()
