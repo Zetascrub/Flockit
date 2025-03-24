@@ -1,93 +1,128 @@
-# Pre-Flight-Check
+# PenTest Pre-Flight Check Tool
 
+This project provides an pre-flight check tool for penetration testing, written in Python. It reads a single `scope.txt` file, automatically splits it into internal, external, and web scope files, and then runs various pre-flight checks (e.g. port scanning, external IP retrieval). It also supports custom settings via an XML file and outputs the scan results in XML format.
 
+## Features
 
-## Getting started
+- **Scope Splitting**
+  - Reads a `scope.txt` file and splits its contents into:
+    - `int_scope.txt` for internal IP addresses/CIDR ranges.
+    - `ext_scope.txt` for external IP addresses/CIDR ranges.
+    - `web_scope.txt` for website URLs.
+- **IP Range Expansion**
+  - Supports expanding IP ranges expressed as `192.168.8.10-100` (last octet ranges).
+- **Bare Domain Handling**
+  - Recognises bare domains (e.g. `Example.com`) and prepends `http://` so they’re treated as URLs.
+- **Pre-Flight Checks**
+  - Performs port scans on IP targets using customisable ports and timeout settings.
+  - Retrieves the external IP address using a configurable URL.
+  - Tags each scope entry as `[IP]` or `[URL]` and logs the results.
+- **XML Output**
+  - Accumulates scan results and generates a pretty-printed XML file (`scan_results.xml`) for further processing.
+- **Custom Settings**
+  - Optionally override default settings (ports, timeout, external IP URL, output format) via an XML file using the `-s` flag.
+- **Project Folder Structure**
+  - Prompts for a project number (default: `PR00000`) and creates a folder with subfolders for Screenshots and Scan-Data.
+- **Logging**
+  - Generates a log file (`preflight_log.txt`) with timestamped events inside the project folder.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Requirements
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- Python 3.x
+- [requests](https://pypi.org/project/requests/)
+- [termcolor](https://pypi.org/project/termcolor/)
 
-## Add your files
+Install the dependencies using pip:
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
+```bash
+pip install requests termcolor
 ```
-cd existing_repo
-git remote add origin https://gitlab.6dgoffsec.co.uk/Thomas/pre-flight-check.git
-git branch -M main
-git push -uf origin main
-```
 
-## Integrate with your tools
-
-- [ ] [Set up project integrations](https://gitlab.6dgoffsec.co.uk/Thomas/pre-flight-check/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+1. Clone or download the repository and place the main script (e.g. preflight_checks.py) in your working directory.
+Usage
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+2. Prepare Your Scope File
+    Place your scope.txt file in the same directory as the script. If one is not found, a sample will be created.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+3. Run the Script
+    
+    Execute the script:
+    ```bash
+    python preflight_checks.py
+    ```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+The script will prompt you for a project number (press Enter to default to PR00000).
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+Optional Custom Settings
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+Provide a custom settings XML file using the -s flag:
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+    ```bash
+    python preflight_checks.py -s path/to/settings.xml
+    ```
 
-## License
-For open source projects, say how it is licensed.
+## Script Process
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+1. Creates a project folder (e.g. PR00000) with subfolders for Screenshots and Scan-Data.
+
+2. Splits scope.txt into int_scope.txt, ext_scope.txt, and web_scope.txt (only if entries exist).
+
+3. Runs pre-flight checks (port scanning for IPs, external IP retrieval, etc.) based on the scope.
+
+4. Generates an XML output file (scan_results.xml) with all scan details.
+
+5. Logs all events in preflight_log.txt.
+
+## Custom Settings XML
+
+To override default settings, create an XML file with the following structure:
+
+```bash
+<settings>
+  <ports>
+    <port>22</port>
+    <port>80</port>
+    <port>443</port>
+    <port>445</port>
+    <port>3389</port>
+  </ports>
+  <timeout>0.5</timeout>
+  <external_ip_url>https://api.ipify.org</external_ip_url>
+  <output_format>XML</output_format>
+</settings>
+```
+
+- ports: List of ports to scan.
+
+- timeout: Connection timeout in seconds.
+
+- external_ip_url: URL to use for external IP retrieval.
+
+- output_format: Desired output format (currently supports XML).
+
+### Example scope.txt
+
+```
+192.168.8.1
+192.168.8.10-100
+Example.com
+192.168.9.0/24
+```
+
+## Project Folder Structure
+
+After running the script, the project folder (e.g. PR00000) will be created with the following structure:
+
+```
+PR00000/
+├── int_scope.txt      # Internal scope entries (if any)
+├── ext_scope.txt      # External scope entries (if any)
+├── web_scope.txt      # Website URLs (if any)
+├── preflight_log.txt  # Log file with timestamped events
+├── scan_results.xml   # XML file containing scan results
+├── Screenshots/       # Folder for screenshots
+└── Scan-Data/         # Folder for scan data
+```
