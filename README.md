@@ -105,13 +105,11 @@ Host                 | Status
 ==================================================
 Summary written to PR00000/summary.txt
 Do you want to upload the project folder to an SMB share? (y/n): y
+Project compressed to PR00000/PR00000.zip
+Zip file created: PR00000/PR00000.zip
 Connected to 192.168.8.239 on share Media
-Uploading PR00000/preflight_log.txt to Projects/PR00000/preflight_log.txt...
-Uploading PR00000/summary.txt to Projects/PR00000/summary.txt...
-Uploading PR00000/scan_results.xml to Projects/PR00000/scan_results.xml...
-Uploading PR00000/int_scope.txt to Projects/PR00000/int_scope.txt...
+Uploading PR00000/PR00000.zip to Projects/PR00000/PR00000.zip...
 Upload completed successfully.
-
 ```
 
 ## Features
