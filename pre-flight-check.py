@@ -4,6 +4,7 @@ import re
 import sys
 import ipaddress
 import socket
+import zipfile
 from datetime import datetime
 import requests
 from termcolor import colored
@@ -11,6 +12,8 @@ import xml.etree.ElementTree as ET
 import xml.dom.minidom as md
 import argparse
 from impacket.smbconnection import SMBConnection
+
+# Version 0.3
 
 # Global variables for custom settings and scan results
 CUSTOM_SETTINGS = {
@@ -158,8 +161,7 @@ Example.com
     web_entries = []
 
     for entry in raw_entries:
-        # Check if the entry is an IP range
-        if "-" in entry and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}-\d{1,3}$", entry):
+        if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}-\d{1,3}$", entry) or "-" in entry:
             expanded = expand_ip_range(entry)
             for ip in expanded:
                 try:
@@ -171,7 +173,6 @@ Example.com
                 except ValueError:
                     continue
         else:
-            # Try to see if it's an IP or CIDR
             try:
                 ipaddress.ip_network(entry, strict=False)
                 if is_internal_ip(entry):
@@ -182,10 +183,8 @@ Example.com
             except ValueError:
                 pass
 
-            # Check if it's a URL (with protocol)
             if re.match(r"^https?://", entry):
                 web_entries.append(entry)
-            # Check if it's a bare domain; if so, prepend http://
             elif is_domain(entry):
                 web_entries.append("http://" + entry)
             else:
@@ -327,6 +326,72 @@ def write_xml_output():
         f.write(pretty_xml)
     print(colored(f"Scan results written to {xml_file}", "cyan"))
 
+def create_project_structure(proj_number):
+    """
+    Create a project folder named after the project number (or PR00000 by default)
+    with subfolders for Screenshots and Scan-Data.
+    """
+    base_folder = proj_number if proj_number else "PR00000"
+    if not os.path.isdir(base_folder):
+        os.makedirs(base_folder)
+        print(f"Created project folder: {base_folder}")
+    else:
+        print(f"Project folder '{base_folder}' already exists.")
+    for sub in ["Screenshots", "Scan-Data"]:
+        sub_path = os.path.join(base_folder, sub)
+        if not os.path.isdir(sub_path):
+            os.makedirs(sub_path)
+            print(f"Created folder: {sub_path}")
+        else:
+            print(f"Folder '{sub_path}' already exists.")
+    return base_folder
+
+def ensure_remote_path(conn, share, remote_path):
+    """
+    Ensure that the full remote_path exists on the SMB share.
+    Splits the path into parts and creates each directory if needed.
+    """
+    parts = remote_path.strip("/").split("/")
+    current_path = ""
+    for part in parts:
+        current_path = current_path + "/" + part if current_path else part
+        try:
+            conn.createDirectory(share, current_path)
+        except Exception:
+            pass
+
+def compress_project_folder(project_folder, zip_filename):
+    """
+    Compress the given project_folder into a zip file named zip_filename.
+    """
+    with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(project_folder):
+            for file in files:
+                full_path = os.path.join(root, file)
+                arcname = os.path.relpath(full_path, project_folder)
+                zipf.write(full_path, arcname)
+    print(f"Project compressed to {zip_filename}")
+
+def upload_project_to_smb(local_file, smb_server, share_name, remote_path, username, password, domain=""):
+    """
+    Upload a single file (local_file) to the remote_path on the SMB share.
+    Ensures the remote directory exists before uploading.
+    """
+    try:
+        conn = SMBConnection(smb_server, smb_server)
+        conn.login(username, password, domain)
+        print(f"Connected to {smb_server} on share {share_name}")
+        ensure_remote_path(conn, share_name, remote_path)
+        remote_file = os.path.join(remote_path, os.path.basename(local_file)).replace("\\", "/")
+        print(f"Uploading {local_file} to {remote_file}...")
+        with open(local_file, 'rb') as fp:
+            conn.putFile(share_name, remote_file, fp.read)
+        conn.logoff()
+        print("Upload completed successfully.")
+    except Exception as e:
+        print("Upload failed:", e)
+
+
 def print_summary():
     """
     Print a summary table of the scan results and write it to a summary.txt file.
@@ -369,80 +434,12 @@ def print_summary():
     except Exception as e:
         print(colored(f"[-] Failed to write summary: {e}", "red"))
 
-
-def create_project_structure(proj_number):
-    """
-    Create a project folder named after the project number (or PR00000 by default)
-    with subfolders for Screenshots and Scan-Data.
-    """
-    base_folder = proj_number if proj_number else "PR00000"
-    if not os.path.isdir(base_folder):
-        os.makedirs(base_folder)
-        print(f"Created project folder: {base_folder}")
-    else:
-        print(f"Project folder '{base_folder}' already exists.")
-    for sub in ["Screenshots", "Scan-Data"]:
-        sub_path = os.path.join(base_folder, sub)
-        if not os.path.isdir(sub_path):
-            os.makedirs(sub_path)
-            print(f"Created folder: {sub_path}")
-        else:
-            print(f"Folder '{sub_path}' already exists.")
-    return base_folder
-
-
-
-def ensure_remote_path(conn, share, remote_path):
-    """
-    Ensure that the full remote_path exists on the SMB share.
-    Splits the path into parts and creates each directory if needed.
-    """
-    # Remove any leading/trailing slashes and split the path
-    parts = remote_path.strip("/").split("/")
-    current_path = ""
-    for part in parts:
-        current_path = current_path + "/" + part if current_path else part
-        try:
-            conn.createDirectory(share, current_path)
-        except Exception as e:
-            # Directory likely already exists, so ignore errors
-            pass
-
-
-def upload_project_to_smb_impacket(project_folder, smb_server, share_name, remote_path, username, password, domain=""):
-    try:
-        from impacket.smbconnection import SMBConnection
-        # Establish the connection; Impacket will negotiate SMB2/3 automatically.
-        conn = SMBConnection(smb_server, smb_server)
-        conn.login(username, password, domain)
-        print(f"Connected to {smb_server} on share {share_name}")
-
-        # Ensure remote directory exists
-        ensure_remote_path(conn, share_name, remote_path)
-
-        # Walk through the project folder and upload each file.
-        for root, dirs, files in os.walk(project_folder):
-            for file in files:
-                local_file = os.path.join(root, file)
-                # Create a remote path relative to the project folder.
-                rel_path = os.path.relpath(local_file, project_folder)
-                remote_file = os.path.join(remote_path, rel_path).replace("\\", "/")
-                print(f"Uploading {local_file} to {remote_file}...")
-                with open(local_file, 'rb') as fp:
-                    conn.putFile(share_name, remote_file, fp.read)
-        conn.logoff()
-        print("Upload completed successfully.")
-    except Exception as e:
-        print("Upload failed:", e)
-
-
-
 def main():
     global PROJECT_FOLDER
-    smb_server = "IP"
-    smb_share = "NAME"
-    smb_user = "USER"
-    smb_pass = "PASS"
+    smb_server = "192.168.8.239"
+    smb_share = "Media"
+    smb_user = ""
+    smb_pass = ""
     parser = argparse.ArgumentParser(
         description="Integrated PenTest Pre-Flight Check Tool with Custom Settings, XML Output, and Summary"
     )
@@ -469,10 +466,13 @@ def main():
     # Prompt user for SMB upload
     upload_choice = input("Do you want to upload the project folder to an SMB share? (y/n): ").strip().lower()
     if upload_choice == 'y':
-        # Build the remote path based on the actual project folder name.
+        # Compress project folder to zip
+        zip_filename = os.path.join(PROJECT_FOLDER, os.path.basename(PROJECT_FOLDER) + ".zip")
+        compress_project_folder(PROJECT_FOLDER, zip_filename)
+        print("Zip file created:", zip_filename)  # Debug print
+        # Build remote path based on actual project folder name.
         remote_path = os.path.join("Projects", os.path.basename(PROJECT_FOLDER))
-        upload_project_to_smb_impacket(PROJECT_FOLDER, smb_server, smb_share, remote_path, smb_user, smb_pass)
-
+        upload_project_to_smb(zip_filename, smb_server, smb_share, remote_path, smb_user, smb_pass)
 
 if __name__ == "__main__":
     main()
