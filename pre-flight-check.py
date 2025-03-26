@@ -751,8 +751,8 @@ class RavenRecon:
 
 def main():
     global PROJECT_FOLDER, logger
-    smb_server = "192.168.8.239"
-    smb_share = "Media"
+    smb_server = ""
+    smb_share = ""
     smb_user = ""
     smb_pass = ""
     parser = argparse.ArgumentParser(
