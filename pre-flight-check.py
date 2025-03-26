@@ -21,8 +21,44 @@ import inspect
 import ollama
 import atexit
 import termios
+import getpass
 
 # Version 0.5.1
+
+## Changelog
+
+# v0.5.1
+# - Resolved terminal input visibility issue using `termios` and `atexit` to restore original settings.
+# - Switched SMB password input to use `getpass.getpass()` for security.
+# - Improved logging: Replaced `print()` with unified `logger` for both console and file outputs.
+# - Fixed user prompt order during AI analysis input to avoid invisible text.
+# - Ensured all output paths use `PROJECT_FOLDER` context (e.g., for reports and zips).
+
+# v0.5
+# - Added AI-powered vulnerability analysis using Ollama + LLaMA 3, based on scan results.
+# - Introduced plugin architecture: dynamic loading from 'plugins/' folder, subclassing `ScanPlugin`.
+# - Implemented service banner grabbing via socket connections.
+# - Added CVE lookup via cve.circl.lu API using discovered services/versions.
+# - Created `RavenRecon` class to modularise scanning, reporting, and analysis.
+
+# v0.4
+# - Added project folder compression to `.zip` before SMB upload.
+# - Updated SMB upload to send zipped archive only (instead of raw folder contents).
+
+# v0.3
+# - Automatically creates `Screenshots` and `Scan-Data` folders inside the project directory.
+# - Builds SMB remote upload path using the project folder name.
+
+# v0.2
+# - Parses `scope.txt` and splits into `int_scope.txt`, `ext_scope.txt`, and `web_scope.txt`.
+# - Initial support for SMB upload using Impacket SMBConnection.
+# - Added terminal summary output and created `summary.txt` with results.
+
+# v0.1
+# - Initial release: port scanner using `nmap` + `socket`, with XML output.
+# - Supports custom settings via XML config (ports, timeout, external IP URL).
+# - Differentiates between internal and external IPs for scanning scope.
+
 
 
 ## Pre-Flight-Script
@@ -67,10 +103,6 @@ def setup_logging(log_file):
     logger.addHandler(file_handler)
     
     return logger
-
-# Save original terminal settings
-fd = sys.stdin.fileno()
-original_term_settings = termios.tcgetattr(fd)
 
 
 def restore_terminal_settings():
@@ -681,7 +713,6 @@ class RavenRecon:
                     # Optionally, add vulnerability lookup per port
                     port_data["vulnerabilities"] = lookup_vulnerabilities_for_port(port_data)
                     host_info["ports"].append(port_data)
-            atexit.register(restore_terminal_settings)
             ai_analysis = input("Do you want to perform AI analysis of the results? (y/n): ").strip().lower()
             if ai_analysis == 'y':
                 logger.info(f"[+] Running AI vulnerability analysis for {host}...")
@@ -758,9 +789,10 @@ class RavenRecon:
                 report_md += f"\n**Vulnerability Lookup Result:**\n```\n{port.get('vulnerabilities', 'No vulnerabilities found.')}\n```\n"
             report_md += "\n## AI Vulnerability Analysis\n\n"
             report_md += data.get("vulnerabilities_ai", "No vulnerabilities identified.") + "\n\n"
-        with open(self.output, "w") as f:
+        raven_report = os.path.join(PROJECT_FOLDER, self.output)
+        with open(raven_report, "w") as f:
             f.write(report_md)
-        logger.info(f"[+] Report saved to {self.output}")
+        logger.info(f"[+] Report saved to {raven_report}")
 
 
 def main():
@@ -785,6 +817,10 @@ def main():
     log_file = os.path.join(PROJECT_FOLDER, "preflight_log.txt")
     logger = setup_logging(log_file)
     logger.info("Unified logging is now configured.")
+
+    # Save original terminal settings
+    fd = sys.stdin.fileno()
+    original_term_settings = termios.tcgetattr(fd)
 
     # Check external IP validity before proceeding with tests.
     check_external_ip_validity()
@@ -811,10 +847,12 @@ def main():
     # Optionally prompt for SMB upload (as before)
     upload_choice = input("Do you want to upload the project folder to an SMB share? (y/n): ").strip().lower()
     if upload_choice == 'y':
+        # Get Credentials
+        smb_pass = getpass.getpass("Enter SMB password (leave blank for none): ")
         # Compress and upload
         zip_filename = os.path.join(PROJECT_FOLDER, os.path.basename(PROJECT_FOLDER) + ".zip")
         compress_project_folder(PROJECT_FOLDER, zip_filename)
-        logger.info("Zip file created:", zip_filename)
+        logger.info(f"Zip file created: {zip_filename}")
         remote_path = os.path.join("Projects", os.path.basename(PROJECT_FOLDER))
         upload_project_to_smb(zip_filename, smb_server, smb_share, remote_path, smb_user, smb_pass)
 
