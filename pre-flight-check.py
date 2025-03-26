@@ -19,8 +19,10 @@ import json
 import importlib.util
 import inspect
 import ollama
+import atexit
+import termios
 
-# Version 0.5
+# Version 0.5.1
 
 
 ## Pre-Flight-Script
@@ -65,6 +67,14 @@ def setup_logging(log_file):
     logger.addHandler(file_handler)
     
     return logger
+
+# Save original terminal settings
+fd = sys.stdin.fileno()
+original_term_settings = termios.tcgetattr(fd)
+
+
+def restore_terminal_settings():
+    termios.tcsetattr(fd, termios.TCSADRAIN, original_term_settings)
 
 
 def load_custom_settings(xml_path):
@@ -166,7 +176,7 @@ def split_scope_file():
 Example.com
 192.168.9.0/24
 """
-        print("scope.txt not found. Creating a sample scope.txt...")
+        logger.info("scope.txt not found. Creating a sample scope.txt...")
         with open(MAIN_SCOPE_FILE, "w") as f:
             f.write(sample)
 
@@ -234,21 +244,21 @@ Example.com
         with open(EXT_SCOPE_FILE, "w") as f:
             for line in ext_entries:
                 f.write(line + "\n")
-        print(f"Created ext_scope.txt with {len(ext_entries)} entries (External IPs).")
+        logger.info(f"Created ext_scope.txt with {len(ext_entries)} entries (External IPs).")
     else:
         if os.path.exists(EXT_SCOPE_FILE):
             os.remove(EXT_SCOPE_FILE)
-        print("No external IPs found; ext_scope.txt not created.")
+        logger.info("No external IPs found; ext_scope.txt not created.")
 
     if web_entries:
         with open(WEB_SCOPE_FILE, "w") as f:
             for line in web_entries:
                 f.write(line + "\n")
-        print(f"Created web_scope.txt with {len(web_entries)} entries (Website URLs).")
+        logger.info(f"Created web_scope.txt with {len(web_entries)} entries (Website URLs).")
     else:
         if os.path.exists(WEB_SCOPE_FILE):
             os.remove(WEB_SCOPE_FILE)
-        print("No website URLs found; web_scope.txt not created.")
+        logger.info("No website URLs found; web_scope.txt not created.")
 
 def check_scope_file(file_path):
     """Read and return non-empty entries from a given scope file."""
@@ -377,16 +387,16 @@ def create_project_structure(proj_number):
     base_folder = proj_number if proj_number else "PR00000"
     if not os.path.isdir(base_folder):
         os.makedirs(base_folder)
-        print(f"Created project folder: {base_folder}")
+        logger.info(f"Created project folder: {base_folder}")
     else:
-        print(f"Project folder '{base_folder}' already exists.")
+        logger.info(f"Project folder '{base_folder}' already exists.")
     for sub in ["Screenshots", "Scan-Data"]:
         sub_path = os.path.join(base_folder, sub)
         if not os.path.isdir(sub_path):
             os.makedirs(sub_path)
-            print(f"Created folder: {sub_path}")
+            logger.info(f"Created folder: {sub_path}")
         else:
-            print(f"Folder '{sub_path}' already exists.")
+            logger.info(f"Folder '{sub_path}' already exists.")
     return base_folder
 
 def ensure_remote_path(conn, share, remote_path):
@@ -413,7 +423,7 @@ def compress_project_folder(project_folder, zip_filename):
                 full_path = os.path.join(root, file)
                 arcname = os.path.relpath(full_path, project_folder)
                 zipf.write(full_path, arcname)
-    print(f"Project compressed to {zip_filename}")
+    logger.info(f"Project compressed to {zip_filename}")
 
 def upload_project_to_smb(local_file, smb_server, share_name, remote_path, username, password, domain=""):
     """
@@ -423,16 +433,16 @@ def upload_project_to_smb(local_file, smb_server, share_name, remote_path, usern
     try:
         conn = SMBConnection(smb_server, smb_server)
         conn.login(username, password, domain)
-        print(f"Connected to {smb_server} on share {share_name}")
+        logger.info(f"Connected to {smb_server} on share {share_name}")
         ensure_remote_path(conn, share_name, remote_path)
         remote_file = os.path.join(remote_path, os.path.basename(local_file)).replace("\\", "/")
-        print(f"Uploading {local_file} to {remote_file}...")
+        logger.info(f"Uploading {local_file} to {remote_file}...")
         with open(local_file, 'rb') as fp:
             conn.putFile(share_name, remote_file, fp.read)
         conn.logoff()
-        print("Upload completed successfully.")
+        logger.info("Upload completed successfully.")
     except Exception as e:
-        print("Upload failed:", e)
+        logger.info("Upload failed:", e)
 
 
 def print_summary():
@@ -466,7 +476,7 @@ def print_summary():
     summary_str = "\n".join(summary_lines)
     
     # Print summary to the terminal
-    print("\n" + summary_str)
+    logger.info("\n" + summary_str)
     
     # Write summary to summary.txt in the project folder
     summary_file = os.path.join(PROJECT_FOLDER, "summary.txt")
@@ -504,6 +514,7 @@ def check_external_ip_validity():
         logger.info(f"[-] Warning: External IP {ext_ip} is not within the valid testing ranges.")
         choice = input("Do you want to continue anyway? (y/n): ").strip().lower()
         if choice != 'y':
+            logger.info("User chose to continue")
             sys.exit("Exiting. Please connect to the VPN and try again.")
     return ext_ip
 
@@ -564,10 +575,10 @@ class RavenRecon:
         try:
             self.scanner = nmap.PortScanner()
         except nmap.PortScannerError:
-            print("[-] Nmap is not installed or not in PATH. Please install it first.", flush=True)
+            logger.info("[-] Nmap is not installed or not in PATH. Please install it first.")
             sys.exit(1)
         if not self.check_ollama():
-            print("[-] Ollama service is not responding. Please ensure it's running.", flush=True)
+            logger.info("[-] Ollama service is not responding. Please ensure it's running.")
             sys.exit(1)
         self.load_external_plugins()  # Load additional plugins from the 'plugins' directory
 
@@ -577,7 +588,7 @@ class RavenRecon:
         Simply drop your .py plugin files in the 'plugins' folder.
         """
         if not os.path.exists(plugins_dir):
-            print(f"[-] Plugins directory '{plugins_dir}' not found. Skipping external plugins.", flush=True)
+            logger.info(f"[-] Plugins directory '{plugins_dir}' not found. Skipping external plugins.")
             return
         for filename in os.listdir(plugins_dir):
             if filename.endswith(".py"):
@@ -592,41 +603,41 @@ class RavenRecon:
                             plugin_instance = obj()
                             self.register_plugin(plugin_instance)
                 except Exception as e:
-                    print(f"[-] Failed to load plugin from {filename}: {e}", flush=True)
+                    logger.info(f"[-] Failed to load plugin from {filename}: {e}")
 
     def register_plugin(self, plugin):
         self.plugins.append(plugin)
-        print(f"[+] Registered plugin: {plugin.name}", flush=True)
+        logger.info(f"[+] Registered plugin: {plugin.name}")
 
     def check_ollama(self):
         try:
             response = requests.get("http://localhost:11434/api/status", timeout=3)
             if response.status_code == 200:
-                print("[+] Ollama service is running (status check)", flush=True)
+                logger.info("[+] Ollama service is running (status check)")
                 return True
         except requests.RequestException as e:
-            print(f"[-] Ollama /api/status check failed: {e}", flush=True)
+            logger.info(f"[-] Ollama /api/status check failed: {e}")
         try:
             response = requests.get("http://localhost:11434/api/version", timeout=3)
             if response.status_code == 200:
-                print("[+] Ollama service is running (version check)", flush=True)
+                logger.info("[+] Ollama service is running (version check)")
                 return True
         except requests.RequestException as e:
-            print(f"[-] Ollama /api/version check failed: {e}", flush=True)
+            logger.info(f"[-] Ollama /api/version check failed: {e}")
         return False
 
     def discover_hosts(self):
-        print(f"[+] Discovering live hosts in {self.targets}...", flush=True)
+        logger.info(f"[+] Discovering live hosts in {self.targets}...")
         self.scanner.scan(hosts=self.targets, arguments="-sn")
         live_hosts = [host for host in self.scanner.all_hosts() if self.scanner[host].state() == "up"]
-        print(f"[+] Found {len(live_hosts)} live hosts", flush=True)
+        logger.info(f"[+] Found {len(live_hosts)} live hosts")
         return live_hosts
 
     def scan_network(self, live_hosts):
         if not live_hosts:
-            print("[-] No live hosts found. Exiting.", flush=True)
+            logger.info("[-] No live hosts found. Exiting.")
             return
-        print("[+] Scanning network for open ports and services...", flush=True)
+        logger.info("[+] Scanning network for open ports and services...")
         scan_arguments = "-O -sV --version-all -sC" if self.mode == "full" else "-F"
         # Using concurrent futures to scan each host concurrently
         import concurrent.futures
@@ -636,13 +647,13 @@ class RavenRecon:
                 host = future_to_host[future]
                 try:
                     self.results[host] = future.result()
-                    print(f"[+] Scan completed for {host}", flush=True)
+                    logger.info(f"[+] Scan completed for {host}")
                 except Exception as exc:
-                    print(f"[-] Error scanning {host}: {exc}", flush=True)
+                    logger.info(f"[-] Error scanning {host}: {exc}")
         self.generate_report()
 
     def scan_host(self, host, arguments):
-        print(f"[+] Starting scan on {host} with arguments: {arguments}", flush=True)
+        logger.info(f"[+] Starting scan on {host} with arguments: {arguments}")
         try:
             self.scanner.scan(host, arguments=arguments)
             host_info = {
@@ -652,7 +663,7 @@ class RavenRecon:
             }
             for proto in self.scanner[host].all_protocols():
                 for port in self.scanner[host][proto].keys():
-                    print(f"[+] Scanning port {port} on {host}...", flush=True)
+                    logger.info(f"[+] Scanning port {port} on {host}...")
                     port_info = self.scanner[host][proto][port]
                     port_data = {
                         "port": port,
@@ -670,16 +681,19 @@ class RavenRecon:
                     # Optionally, add vulnerability lookup per port
                     port_data["vulnerabilities"] = lookup_vulnerabilities_for_port(port_data)
                     host_info["ports"].append(port_data)
-            print(f"[+] Running AI vulnerability analysis for {host}...", flush=True)
-            host_info["vulnerabilities_ai"] = self.analyse_vulnerabilities(host_info)
-            print(f"[+] AI analysis completed for {host}.", flush=True)
+            atexit.register(restore_terminal_settings)
+            ai_analysis = input("Do you want to perform AI analysis of the results? (y/n): ").strip().lower()
+            if ai_analysis == 'y':
+                logger.info(f"[+] Running AI vulnerability analysis for {host}...")
+                host_info["vulnerabilities_ai"] = self.analyse_vulnerabilities(host_info)
+                logger.info(f"[+] AI analysis completed for {host}.")
             return host_info
         except Exception as e:
-            print(f"[-] Exception scanning {host}: {str(e)}", flush=True)
+            logger.info(f"[-] Exception scanning {host}: {str(e)}")
             return {}
 
     def grab_banner(self, host, port, port_data):
-        print(f"[+] Grabbing banner for {host}:{port}...", flush=True)
+        logger.info(f"[+] Grabbing banner for {host}:{port}...")
         try:
             with socket.create_connection((host, port), timeout=2) as s:
                 s.sendall(b"\r\n")
@@ -717,17 +731,17 @@ class RavenRecon:
         return len(re.findall(r'\*\*Vulnerability \d+:', vulnerabilities_text))
 
     def generate_report(self):
-        print("[+] Generating report...", flush=True)
+        logger.info("[+] Generating report...")
         report_md = f"# Internal Network Scan Report\n\n"
         report_md += f"**Scan Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         report_md += f"**Targets:** {self.targets}\n\n"
         if not self.results:
-            print("[-] No scan results to report.", flush=True)
+            logger.info("[-] No scan results to report.")
             return
         total_hosts = len(self.results)
         total_ports = sum(len(data.get("ports", [])) for data in self.results.values())
         total_vulns = sum(self.count_vulnerabilities(data.get("vulnerabilities_ai", "")) for data in self.results.values())
-        print(f"[+] Scan Summary:\n Hosts Scanned: {total_hosts}\n Ports Scanned: {total_ports}\n Vulnerabilities Found (AI): {total_vulns}", flush=True)
+        logger.info(f"[+] Scan Summary:\n Hosts Scanned: {total_hosts}\n Ports Scanned: {total_ports}\n Vulnerabilities Found (AI): {total_vulns}")
         report_md += "**Scan Summary:**\n"
         report_md += f"- Hosts Scanned: {total_hosts}\n"
         report_md += f"- Ports Scanned: {total_ports}\n"
@@ -746,13 +760,13 @@ class RavenRecon:
             report_md += data.get("vulnerabilities_ai", "No vulnerabilities identified.") + "\n\n"
         with open(self.output, "w") as f:
             f.write(report_md)
-        print(f"[+] Report saved to {self.output}", flush=True)
+        logger.info(f"[+] Report saved to {self.output}")
 
 
 def main():
     global PROJECT_FOLDER, logger
-    smb_server = ""
-    smb_share = ""
+    smb_server = "192.168.8.239"
+    smb_share = "Media"
     smb_user = ""
     smb_pass = ""
     parser = argparse.ArgumentParser(
@@ -800,7 +814,7 @@ def main():
         # Compress and upload
         zip_filename = os.path.join(PROJECT_FOLDER, os.path.basename(PROJECT_FOLDER) + ".zip")
         compress_project_folder(PROJECT_FOLDER, zip_filename)
-        print("Zip file created:", zip_filename)
+        logger.info("Zip file created:", zip_filename)
         remote_path = os.path.join("Projects", os.path.basename(PROJECT_FOLDER))
         upload_project_to_smb(zip_filename, smb_server, smb_share, remote_path, smb_user, smb_pass)
 
@@ -815,9 +829,9 @@ def main():
             if live_hosts:
                 raven.scan_network(live_hosts)
             else:
-                print("[-] No live hosts found. Exiting.", flush=True)
+                logger.info("[-] No live hosts found. Exiting.")
     else:
-        print("[-] No recon targets found from scope files. Exiting.", flush=True)
+        logger.info("[-] No recon targets found from scope files. Exiting.")
 
 
 if __name__ == "__main__":
