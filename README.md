@@ -61,9 +61,6 @@ class MyCustomPlugin(ScanPlugin):
         return "Hello from plugin"
 ```
 
-
-
-
 ## Requirements
 
 - Python 3.x
