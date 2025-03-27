@@ -1,0 +1,18 @@
+<Settings>
+    <Ports>22,80,443,445,3389</Ports>
+    <Timeout>0.5</Timeout>
+    <ExternalIPURL>https://api.ipify.org</ExternalIPURL>
+    <OutputFormat>XML</OutputFormat>
+
+    <SMB>
+        <Server>[IP ADDRESS]</Server>
+        <Share>[SHARE NAME]</Share>
+        <Username>[USERNAME]</Username>
+    </SMB>
+
+    <ValidExternalRanges>
+        <Range>[IP RANGE]</Range>
+    </ValidExternalRanges>
+
+
+</Settings>
