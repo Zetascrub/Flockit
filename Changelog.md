@@ -19,13 +19,26 @@ All notable changes to the **Pre-Flight Check Tool** will be documented in this 
 - Added `print_banner()` to mark major script phases with styled headings.
 - Suppressed duplicate console output by removing the `StreamHandler` from the logger setup.
 - Streamlined messaging logic across internal modules (`PreFlightCheck`, `util.py`).
-- Migrating settings to settings.xml for ease of change.
+- Migrated settings to `settings.xml` for dynamic configuration (ports, timeout, SMB info, valid IP ranges).
+- Modularised the codebase into themed components:
+  - `PreFlight` (scope parsing, setup, SMB upload)
+  - `RavenRecon` (active scanning with plugins)
+  - `Owl` (markdown reporting & AI analysis)
+- Plugins are now standalone files and can inherit from a base `ScanPlugin`.
+- Plugin scanning now uses consistent output format and integrates with `raven.results`.
 
 ### Fixed
 - Resolved terminal output duplication caused by combined logger and print calls.
 - Fixed indentation and `cprint` argument bugs within the enhanced `print_status()` function.
 - Corrected `getpass` usage to avoid `TypeError: 'module' object is not callable`.
-- RavenRecon plugins working with new project and output is consistent
+- Plugins now load independently using safe dynamic import handling.
+- Fixed `KeyError` on `nmap` scan results when hosts return no data.
+- Prevented `UnboundLocalError` when skipping active recon or AI analysis.
+
+### Added
+- Full rewrite of `README.md` to reflect new modular structure.
+- Added `demo.gif` terminal preview support.
+- Introduced `Why Flockit?` section to explain the naming and vision behind the tool.
 
 ---
 
