@@ -25,6 +25,7 @@ All notable changes to the **Pre-Flight Check Tool** will be documented in this 
 - Resolved terminal output duplication caused by combined logger and print calls.
 - Fixed indentation and `cprint` argument bugs within the enhanced `print_status()` function.
 - Corrected `getpass` usage to avoid `TypeError: 'module' object is not callable`.
+- RavenRecon plugins working with new project and output is consistent
 
 ---
 
