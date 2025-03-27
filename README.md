@@ -2,6 +2,9 @@
 
 This project provides a pre-flight check tool for penetration testing, written in Python. It reads a single `scope.txt` file, automatically splits it into internal, external, and web scope files, and then runs various pre-flight checks (e.g. port scanning, external IP retrieval). It also supports custom settings via an XML file (`settings.xml`) and outputs the scan results in XML format.
 
+## Demo
+
+![Demo](Demo.gif)
 
 ## Features
 
@@ -58,9 +61,7 @@ class MyCustomPlugin(ScanPlugin):
         return "Hello from plugin"
 ```
 
-## Demo
 
-![Demo](Demo.gif)
 
 
 ## Requirements
