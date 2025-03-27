@@ -1,39 +1,67 @@
 # 🦅 Flockit - Modular Pentest Pre-Flight & Recon Tool
 
-Flockit is a modular penetration testing assistant that automates the pre-engagement setup, basic recon, vulnerability enumeration, and report generation. Initially built for validating scope and reachability, it has grown into a full multi-phase toolset with support for plugins, AI-driven analysis, and team-friendly outputs.
+**Flockit** is a modular penetration testing assistant that automates the pre-engagement setup, basic recon, vulnerability enumeration, and report generation. Initially built for validating scope and reachability, it has grown into a full multi-phase toolset with support for plugins, AI-driven analysis, and team-friendly outputs.
+
+---
+
+# 🤔 Why Flockit?
+
+- Bird-Themed Modules: PreFlight checks, RavenRecon, and Owl reporting—each inspired by speed, intelligence, and vision.
+- From Boot to Report: Designed for real-world pentesters to get from scope file to upload in minutes.
+- Smart, Not Noisy: Flockit doesn't just scan—it organises, interprets, and documents.
+- Built for Teams: Project folder structure and plugin architecture make it easy to hand off or scale.
+- Modular as Flock: Swap in custom plugins, use XML/Markdown outputs, or integrate into your own workflow.
 
 
-## Features
+## 🚀 Key Features
 
-- **Scope Splitting**
-  - Reads a `scope.txt` file and splits its contents into:
-    - `int_scope.txt` for internal IP addresses/CIDR ranges.
-    - `ext_scope.txt` for external IP addresses/CIDR ranges.
-    - `web_scope.txt` for website URLs.
-- **IP Range Expansion**
-  - Supports expanding IP ranges expressed as `192.168.8.10-100` (last octet ranges).
-- **Bare Domain Handling**
-  - Recognises bare domains (e.g. `Example.com`) and prepends `http://` so they’re treated as URLs.
-- **Pre-Flight Checks**
-  - Performs port scans on IP targets using customisable ports and timeout settings.
-  - Retrieves the external IP address using a configurable URL.
-  - Tags each scope entry as `[IP]` or `[URL]` and logs the results.
-- **Auto Mode**
-  - Use `--auto` to run the entire script non-interactively.
-- **ASCII Visualisation**
-  - Use `--ascii` to generate a subnet-based network map of discovered hosts and services.
-- **XML Output**
-  - Accumulates scan results and generates a pretty-printed XML file (`scan_results.xml`) for further processing.
-- **User-Friendly Output**
-  - Uses `print_status()` to display emojis and color-coded symbols in the terminal, while still logging to a file.
-- **Custom Settings via XML**
-  - Optionally override default settings (ports, timeout, external IP URL, output format, SMB details) using a `settings.xml` file.
-- **Project Folder Structure**
-  - Prompts for a project number (default: `PR00000`) and creates a folder with subfolders for Screenshots and Scan-Data.
-- **Logging**
-  - Generates a log file (`preflight_log.txt`) with timestamped events inside the project folder.
-- **SMB Upload**
-  - Exports the files to an SMB share using credentials provided via `settings.xml` and prompts for the password.
+### 🧽 Pre-Flight Checks
+- Parses `scope.txt` and auto-generates:
+  - `int_scope.txt` (Internal IPs)
+  - `ext_scope.txt` (External IPs)
+  - `web_scope.txt` (Web targets)
+- Expands IP ranges (e.g., `192.168.8.1-10`)
+- Classifies domains and CIDR blocks intelligently
+
+### 🔍 Raven (Active Scanning)
+- Pings internal and external hosts to determine availability
+- Performs port scanning with options for quick (`-F`) or full (`-p-`) modes
+- Supports threaded scanning with banner grabbing
+- Plugin system for service-specific checks (e.g. HTTP, SSH, SMB)
+
+### 🤖 Owl (Reporting & AI Analysis)
+- Auto-generates Markdown reports with:
+  - Host summaries
+  - Service details
+  - Plugin findings
+  - AI-based vulnerability analysis via Ollama
+- Optional ASCII visualisation for quick subnet views
+
+### ⚙️ Plugin Support
+- Drop-in plugin files into the `modules/plugins/` folder
+- Each plugin inherits from `ScanPlugin` located in `modules/plugins/__init__.py`
+- Custom output can be included per-service/port
+
+### 🛠️ Custom Settings
+- Load scanning config from `settings.xml`:
+
+  ```xml
+  <settings>
+    <Ports>22,80,443,445,3389</Ports>
+    <Timeout>0.5</Timeout>
+    <ExternalIPURL>https://api.ipify.org</ExternalIPURL>
+    <OutputFormat>XML</OutputFormat>
+    <ValidRanges>
+      <Range>82.147.10.192/28</Range>
+      <Range>82.147.10.208/28</Range>
+    </ValidRanges>
+    <SMB>
+      <Server>fileshare.local</Server>
+      <Share>Projects</Share>
+      <Username>tester</Username>
+    </SMB>
+  </settings>
+
 
 
 ## Writing Custom Plugins
@@ -62,6 +90,60 @@ class MyCustomPlugin(ScanPlugin):
 
 ![Demo](demo.gif)
 
+# 🧪 Usage
+
+## ⟲ Basic Usage
+
+```bash
+python3 flockit.py
+```
+
+## ⚡ Auto Mode (No Prompts)
+
+```bash
+python3 flockit.py --auto --project PR00099 --mode full
+```
+
+# 📄 Example Scope
+
+```bash
+192.168.8.1
+192.168.8.10-15
+example.com
+192.168.9.0/24
+```
+
+
+## Script Process
+
+1. Creates a project folder (e.g. PR00000) with subfolders for Screenshots and Scan-Data.
+
+2. Splits `scope.txt` into `int_scope.txt`, `ext_scope.txt`, and `web_scope.txt` (only if entries exist).
+
+3. Runs pre-flight checks (port scanning for IPs, external IP retrieval, etc.) based on the scope.
+
+4. Generates an XML output file (`scan_results.xml`) with all scan details.
+
+5. Logs all events in `preflight_log.txt`.
+
+6. Uploads results to SMB share (password is prompted securely).
+
+🗂 Output Overview
+
+After running the script, the project folder (e.g. PR00000) will be created with the following structure:
+
+```
+PR00099/
+├── int_scope.txt
+├── ext_scope.txt
+├── web_scope.txt
+├── scan_results.xml
+├── raven_report.md
+├── preflight_log.txt
+├── Screenshots/
+└── Scan-Data/
+
+```
 
 ## Requirements
 
@@ -78,10 +160,9 @@ Install the dependencies using pip:
 pip install -r requirements.txt
 ```
 
-
 ## Installation
 
-1. Clone or download the repository and place the main script (e.g. `pre-flight-check_0.6.py`) in your working directory.
+1. Clone or download the repository and place the main script in your working directory.
 
 2. Prepare Your Scope File
     Place your `scope.txt` file in the same directory as the script. If one is not found, a sample will be created.
@@ -96,64 +177,3 @@ pip install -r requirements.txt
 
 The script will prompt you for a project number (press Enter to default to PR00000).
 
-## Script Process
-
-1. Creates a project folder (e.g. PR00000) with subfolders for Screenshots and Scan-Data.
-
-2. Splits `scope.txt` into `int_scope.txt`, `ext_scope.txt`, and `web_scope.txt` (only if entries exist).
-
-3. Runs pre-flight checks (port scanning for IPs, external IP retrieval, etc.) based on the scope.
-
-4. Generates an XML output file (`scan_results.xml`) with all scan details.
-
-5. Logs all events in `preflight_log.txt`.
-
-6. Uploads results to SMB share (password is prompted securely).
-
-## Custom Settings XML
-
-The script will automatically look for a `settings.xml` file in the same directory.
-
-```xml
-<Settings>
-    <Ports>22,80,443,445,3389</Ports>
-    <Timeout>0.5</Timeout>
-    <ExternalIPURL>https://api.ipify.org</ExternalIPURL>
-    <OutputFormat>XML</OutputFormat>
-
-    <SMB>
-        <Server>192.168.8.239</Server>
-        <Share>Media</Share>
-        <Username>pentest</Username>
-    </SMB>
-</Settings>
-```
-
-- `Ports`: List of ports to scan (comma-separated).
-- `Timeout`: Connection timeout in seconds.
-- `ExternalIPURL`: URL to use for external IP retrieval.
-- `OutputFormat`: Currently supports `XML`.
-- `SMB`: SMB server, share, and username (password is securely prompted).
-
-### Example `scope.txt`
-
-```
-192.168.8.1
-192.168.8.10-100
-Example.com
-192.168.9.0/24
-```
-
-## Project Folder Structure
-
-After running the script, the project folder (e.g. PR00000) will be created with the following structure:
-
-```
-PR00000/
-├── int_scope.txt      # Internal scope entries (if any)
-├── ext_scope.txt      # External scope entries (if any)
-├── web_scope.txt      # Website URLs (if any)
-├── preflight_log.txt  # Log file with timestamped events
-├── scan_results.xml   # XML file containing scan results
-├── Screenshots/       # Folder for screenshots
-└── Scan-Data/         # Folder for scan data
