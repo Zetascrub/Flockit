@@ -6,19 +6,37 @@ All notable changes to the **Pre-Flight Check Tool** will be documented in this 
 
 ### Planned / To-Do
 - Passive Recon: WHOIS and DNS record lookups with parser integration.
-- Severity tagging and markdown colorization in AI output.
-- Improve logging output, give a cleaner output of relavent data
-- 
+- Severity tagging and markdown colourisation in AI output.
+- Potential project name change
+---
+
+## [0.6.2]
+
+### Improved
+- Replaced standard logging output in the terminal with `print_status()` for cleaner, user-friendly output.
+  - Status levels use emojis and colors (e.g., ✅ success, ⚠️ warning, ❌ error).
+  - Automatically logs to file while showing clean output in terminal.
+- Added `print_banner()` to mark major script phases with styled headings.
+- Suppressed duplicate console output by removing the `StreamHandler` from the logger setup.
+- Streamlined messaging logic across internal modules (`PreFlightCheck`, `util.py`).
+- Migrating settings to settings.xml for ease of change.
+
+### Fixed
+- Resolved terminal output duplication caused by combined logger and print calls.
+- Fixed indentation and `cprint` argument bugs within the enhanced `print_status()` function.
+- Corrected `getpass` usage to avoid `TypeError: 'module' object is not callable`.
 
 ---
 
-## [0.6.1] - In progress
+## [0.6.1]
 
 ### Added
 - ASCII Network Visualisation with `--ascii` flag:
   - Groups hosts by /24 subnet
   - Displays open services next to each host
   - Terminal-friendly map layout
+
+---
 
 ## [0.6.0]
 

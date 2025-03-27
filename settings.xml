@@ -1,0 +1,12 @@
+<Settings>
+    <Ports>22,80,443,445,3389</Ports>
+    <Timeout>0.5</Timeout>
+    <ExternalIPURL>https://api.ipify.org</ExternalIPURL>
+    <OutputFormat>XML</OutputFormat>
+
+    <SMB>
+        <Server>[IP/HOST NAME]</Server>
+        <Share>[SHARE NAME]</Share>
+        <Username>[USER NAME]</Username>
+    </SMB>
+</Settings>

@@ -19,15 +19,11 @@ import getpass
 from util import *
  
 
-version = "6.1"
+version = "0.6.2"
 
 # Global variables for custom settings and scan results
-CUSTOM_SETTINGS = {
-    "ports": [22, 80, 443, 445, 3389],
-    "timeout": 0.5,
-    "external_ip_url": "https://api.ipify.org",
-    "output_format": "XML"  # default output format
-}
+CUSTOM_SETTINGS = load_settings_xml()
+
 
 SCAN_RESULTS = {}  # Dictionary to store scan results per mode
 PROJECT_FOLDER = ""  # Set in main()
@@ -47,7 +43,7 @@ class PreFlightCheck:
 
         if not os.path.isfile(MAIN_SCOPE_FILE):
             sample = "192.168.8.1\n192.168.8.10-12\nExample.com\n192.168.9.0/24\n"
-            logger.info("scope.txt not found. Creating a sample scope.txt...")
+            print_status("scope.txt not found. Creating a sample scope.txt...", "warning")
             with open(MAIN_SCOPE_FILE, "w") as f:
                 f.write(sample)
 
@@ -97,38 +93,38 @@ class PreFlightCheck:
                 elif is_domain(entry):
                     web_entries.append("http://" + entry)
                 else:
-                    logger.info(f"[-] Unrecognized scope entry format: {entry}")
+                    print_status(f"[-] Unrecognized scope entry format: {entry}", "error")
 
         # Save results
         if int_entries:
             with open(INT_SCOPE_FILE, "w") as f:
                 for line in int_entries:
                     f.write(line + "\n")
-            logger.info(f"Created int_scope.txt with {len(int_entries)} entries (Internal IPs).")
+            print_status(f"Created int_scope.txt with {len(int_entries)} entries (Internal IPs).","info")
         else:
             if os.path.exists(INT_SCOPE_FILE):
                 os.remove(INT_SCOPE_FILE)
-            logger.info("No internal IPs found; int_scope.txt not created.")
+            print_status("No internal IPs found; int_scope.txt not created.","info")
 
         if ext_entries:
             with open(EXT_SCOPE_FILE, "w") as f:
                 for line in ext_entries:
                     f.write(line + "\n")
-            logger.info(f"Created ext_scope.txt with {len(ext_entries)} entries (External IPs).")
+            print_status(f"Created ext_scope.txt with {len(ext_entries)} entries (External IPs).", "info")
         else:
             if os.path.exists(EXT_SCOPE_FILE):
                 os.remove(EXT_SCOPE_FILE)
-            logger.info("No external IPs found; ext_scope.txt not created.")
+            print_status("No external IPs found; ext_scope.txt not created.", "warning")
 
         if web_entries:
             with open(WEB_SCOPE_FILE, "w") as f:
                 for line in web_entries:
                     f.write(line + "\n")
-            logger.info(f"Created web_scope.txt with {len(web_entries)} entries (Website URLs).")
+            print_status(f"Created web_scope.txt with {len(web_entries)} entries (Website URLs).", "info")
         else:
             if os.path.exists(WEB_SCOPE_FILE):
                 os.remove(WEB_SCOPE_FILE)
-            logger.info("No website URLs found; web_scope.txt not created.")
+            print_status("No website URLs found; web_scope.txt not created.","warning")
 
     def check_external_ip_validity(self):
         ext_ip = requests.get(CUSTOM_SETTINGS["external_ip_url"]).text
@@ -142,15 +138,15 @@ class PreFlightCheck:
         try:
             ip_obj = ipaddress.ip_address(ext_ip)
         except ValueError:
-            logger.info("[-] Invalid external IP format received.")
+            print_status("[-] Invalid external IP format received.", "error")
             return ext_ip
         if any(ip_obj in net for net in valid_networks):
-            logger.info(f"[+] External IP {ext_ip} is valid for testing.")
+            print_status(f"[+] External IP {ext_ip} is valid for testing.", "info")
         else:
-            logger.info(f"[-] Warning: External IP {ext_ip} is not within the valid testing ranges.")
+            print_status(f"[-] Warning: External IP {ext_ip} is not within the valid testing ranges.", "warning")
             choice = prompt_yes_no("Do you want to continue anyway? (y/n): ", AUTO_MODE)
             if choice != 'y':
-                logger.info("User chose to exit due to invalid external IP.")
+                print_status("User chose to exit due to invalid external IP.", "info")
                 sys.exit("Exiting. Please connect to the VPN and try again.")
         return ext_ip
 
@@ -163,23 +159,27 @@ class PreFlightCheck:
                     zipf.write(full_path, arcname)
         logging.getLogger().info(f"Project compressed to {zip_filename}")
 
-    def upload_to_smb(self, local_file, smb_server, share_name, remote_path, username, password, domain=""):
+    def upload_to_smb(self, local_file, remote_path, domain=""):
         try:
-            from impacket.smbconnection import SMBConnection
+            smb_server = CUSTOM_SETTINGS.get("smb_server") or input("SMB Server: ")
+            smb_share = CUSTOM_SETTINGS.get("smb_share") or input("SMB Share: ")
+            smb_user = CUSTOM_SETTINGS.get("smb_username") or input("SMB Username: ")
+            smb_pass = getpass.getpass("Enter SMB password (leave blank for none): ")
             conn = SMBConnection(smb_server, smb_server)
-            conn.login(username, password, domain)
+            conn.login(smb_user, smb_pass, domain)
             logger = logging.getLogger()
-            logger.info(f"Connected to {smb_server} on share {share_name}")
+            print_status(f"Connected to {smb_server} on share {smb_share}", "info")
             # ensure_remote_path is assumed to be defined elsewhere or as a method.
-            ensure_remote_path(conn, share_name, remote_path)
+            ensure_remote_path(conn, smb_share, remote_path)
             remote_file = os.path.join(remote_path, os.path.basename(local_file)).replace("\\", "/")
-            logger.info(f"Uploading {local_file} to {remote_file}...")
+            print_status(f"Uploading {local_file} to {remote_file}...", "upload")
             with open(local_file, 'rb') as fp:
-                conn.putFile(share_name, remote_file, fp.read)
+                conn.putFile(smb_share, remote_file, fp.read)
             conn.logoff()
-            logger.info("Upload completed successfully.")
+            print_status("Upload completed successfully.", "success")
         except Exception as e:
-            logger.info("Upload failed:", e)
+            print_status(f"Upload failed: {e.args}", "warning")
+
 
 
     def check_scope_file(self, file_path):
@@ -206,7 +206,7 @@ class PreFlightCheck:
     def port_scan(self, ip):
         """Scan a set of common ports on the given IP address using custom settings.
         Returns a list of open ports."""
-        logger.info(f"[*] Scanning common ports on {ip}...")
+        print_status(f"[*] Scanning common ports on {ip}...", "info")
         open_ports = []
         for port in CUSTOM_SETTINGS["ports"]:
             try:
@@ -219,9 +219,9 @@ class PreFlightCheck:
             except socket.error:
                 continue
         if open_ports:
-            logger.info(f"[+] Open ports on {ip}: {open_ports}")
+            print_status(f"[+] Open ports on {ip}: {open_ports}", "info")
         else:
-            logger.info(f"[-] No common ports open on {ip}")
+            print_status(f"[-] No common ports open on {ip}", "info")
         return open_ports
 
 
@@ -229,10 +229,10 @@ class PreFlightCheck:
         """Retrieve and log the external IP address using custom or default URL."""
         try:
             ip = requests.get(CUSTOM_SETTINGS["external_ip_url"]).text
-            logger.info(f"[+] External IP Address: {ip}")
+            print_status(f"[+] External IP Address: {ip}", "info")
             return ip
         except requests.RequestException:
-            logger.info("[-] Unable to determine external IP address.")
+            print_status("[-] Unable to determine external IP address.", "warning")
             return ""
 
 
@@ -267,7 +267,7 @@ class PreFlightCheck:
         xml_file = os.path.join(PROJECT_FOLDER, "scan_results.xml")
         with open(xml_file, "w") as f:
             f.write(pretty_xml)
-        logger.info(f"Scan results written to {xml_file}")
+        print_status(f"Scan results written to {xml_file}", "success")
 
 
     def print_summary(self):
@@ -301,16 +301,16 @@ class PreFlightCheck:
         summary_str = "\n".join(summary_lines)
         
         # Print summary to the terminal
-        logger.info("\n" + summary_str)
+        print_status("\n" + summary_str, "info")
         
         # Write summary to summary.txt in the project folder
         summary_file = os.path.join(PROJECT_FOLDER, "summary.txt")
         try:
             with open(summary_file, "w") as f:
                 f.write(summary_str)
-            logger.info(f"Summary written to {summary_file}")
+            print_status(f"Summary written to {summary_file}", "success")
         except Exception as e:
-            logger.info(f"[-] Failed to write summary: {e}")
+            print_status(f"[-] Failed to write summary: {e.args}", "error")
 
     def run_checks(self, mode, file_path):
         """
@@ -318,25 +318,25 @@ class PreFlightCheck:
         For external and web modes, fetch the external IP.
         Accumulate results in the global SCAN_RESULTS dictionary.
         """
-        logger.info(f"[*] Running pre-flight checks for: {mode.upper()}")
+        print_status(f"[*] Running pre-flight checks for: {mode.upper()}", "info")
         mode_results = []
         if mode in ["ext", "web"]:
             ext_ip = self.get_external_ip()
             mode_results.append({"external_ip": ext_ip})
         scope_entries = self.check_scope_file(file_path)
         if not scope_entries:
-            logger.info(f"[-] Skipping {mode.upper()} checks due to no entries.")
+            print_status(f"[-] Skipping {mode.upper()} checks due to no entries.", "warning")
             return
         for entry in scope_entries:
             result = {}
             result["target"] = entry
             result["tag"] = self.auto_tag(entry)
-            logger.info(f"[~] {result['tag']}")
-            logger.info(f"Tagged scope entry: {result['tag']}")
+            print_status(f"[~] {result['tag']}", "info")
+            print_status(f"Tagged scope entry: {result['tag']}", "info")
             if "[IP]" in result["tag"]:
                 result["open_ports"] = self.port_scan(entry)
             mode_results.append(result)
-        logger.info(f"[+] {mode.upper()} pre-flight checks passed.\n")
+        print_status(f"[+] {mode.upper()} pre-flight checks passed.\n", "success")
         SCAN_RESULTS[mode] = mode_results
 
 # --- RavenRecon Class ---
@@ -350,26 +350,26 @@ class RavenRecon:
         try:
             self.scanner = nmap.PortScanner()
         except nmap.PortScannerError:
-            logger.info("[-] Nmap is not installed or not in PATH. Please install it first.")
+            print_status("[-] Nmap is not installed or not in PATH. Please install it first.", "error")
             sys.exit(1)
         if not self.check_ollama():
-            logger.info("[-] Ollama service is not responding. Please ensure it's running.")
+            print_status("[-] Ollama service is not responding. Please ensure it's running.", "error")
             sys.exit(1)
         self.load_external_plugins()
 
 
     def discover_hosts(self):
-        logger.info(f"[+] Discovering live hosts in {self.targets}...")
+        print_status(f"[+] Discovering live hosts in {self.targets}...", "info")
         self.scanner.scan(hosts=self.targets, arguments="-sn")
         live_hosts = [host for host in self.scanner.all_hosts() if self.scanner[host].state() == "up"]
-        logger.info(f"[+] Found {len(live_hosts)} live hosts")
+        print_status(f"[+] Found {len(live_hosts)} live hosts", "info")
         return live_hosts
 
     def scan_network(self, live_hosts):
         if not live_hosts:
-            logger.info("[-] No live hosts found. Exiting.")
+            print_status("[-] No live hosts found. Exiting.", "warning")
             return
-        logger.info("[+] Scanning network for open ports and services...")
+        print_status("[+] Scanning network for open ports and services...", "info")
         scan_arguments = "-O -sV --version-all -sC" if self.mode == "full" else "-F"
         import concurrent.futures
         try:
@@ -379,14 +379,14 @@ class RavenRecon:
                     host = future_to_host[future]
                     try:
                         self.results[host] = future.result()
-                        logger.info(f"[+] Scan completed for {host}")
+                        print_status(f"[+] Scan completed for {host}", "success")
                     except Exception as exc:
-                        logger.info(f"[-] Error scanning {host}: {exc}")
+                        print_status(f"[-] Error scanning {host}: {exc}", "error")
         except KeyboardInterrupt:
-            logger.info("[-] Scan interrupted by user. Shutting down.")
+            print_status("[-] Scan interrupted by user. Shutting down.", "error")
 
     def scan_host(self, host, arguments):
-        logger.info(f"[+] Starting scan on {host} with arguments: {arguments}")
+        print_status(f"[+] Starting scan on {host} with arguments: {arguments}", "info")
         try:
             self.scanner.scan(host, arguments=arguments)
             host_info = {
@@ -396,7 +396,7 @@ class RavenRecon:
             }
             for proto in self.scanner[host].all_protocols():
                 for port in self.scanner[host][proto].keys():
-                    logger.info(f"[+] Scanning port {port} on {host}...")
+                    print_status(f"[+] Scanning port {port} on {host}...", "info")
                     port_info = self.scanner[host][proto][port]
                     port_data = {
                         "port": port,
@@ -414,12 +414,12 @@ class RavenRecon:
                     host_info["ports"].append(port_data)
             return host_info
         except Exception as e:
-            logger.info(f"[-] Exception scanning {host}: {str(e)}")
+            print_status(f"[-] Exception scanning {host}: {e.args}", "error")
             return {}
 
 
     def grab_banner(self, host, port, port_data):
-        logger.info(f"[+] Grabbing banner for {host}:{port}...")
+        print_status(f"[+] Grabbing banner for {host}:{port}...", "info")
         try:
             with socket.create_connection((host, port), timeout=2) as s:
                 s.sendall(b"\r\n")
@@ -454,7 +454,7 @@ class RavenRecon:
 
     def load_external_plugins(self, plugins_dir="plugins"):
         if not os.path.exists(plugins_dir):
-            logger.info(f"[-] Plugins directory '{plugins_dir}' not found. Skipping external plugins.")
+            print_status(f"[-] Plugins directory '{plugins_dir}' not found. Skipping external plugins.", "warning")
             return
         for filename in os.listdir(plugins_dir):
             if filename.endswith(".py"):
@@ -469,27 +469,27 @@ class RavenRecon:
                             plugin_instance = obj()
                             self.register_plugin(plugin_instance)
                 except Exception as e:
-                    logger.info(f"[-] Failed to load plugin from {filename}: {e}")
+                    print_status(f"[-] Failed to load plugin from {filename}: {e.args}", "error")
 
     def register_plugin(self, plugin):
         self.plugins.append(plugin)
-        logger.info(f"[+] Registered plugin: {plugin.name}")
+        print_status(f"[+] Registered plugin: {plugin.name}", "info")
 
     def check_ollama(self):
         try:
             response = requests.get("http://localhost:11434/api/status", timeout=3)
             if response.status_code == 200:
-                logger.info("[+] Ollama service is running (status check)")
+                print_status("[+] Ollama service is running (status check)", "info")
                 return True
         except requests.RequestException as e:
-            logger.info(f"[-] Ollama /api/status check failed: {e}")
+            print_status(f"[-] Ollama /api/status check failed: {e.args}", "error")
         try:
             response = requests.get("http://localhost:11434/api/version", timeout=3)
             if response.status_code == 200:
-                logger.info("[+] Ollama service is running (version check)")
+                print_status("[+] Ollama service is running (version check)", "info")
                 return True
         except requests.RequestException as e:
-            logger.info(f"[-] Ollama /api/version check failed: {e}")
+            print_status(f"[-] Ollama /api/version check failed: {e.args}", "error")
         return False
 
 
@@ -505,17 +505,17 @@ class ReportGenerator:
         self.output_path = output_path
 
     def generate_report(self):
-        logger.info("[+] Generating report...")
+        print_status("[+] Generating report...", "info")
         report_md = f"# Internal Network Scan Report\n\n"
         report_md += f"**Scan Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         report_md += f"**Targets:** {self.targets}\n\n"
         if not self.results:
-            logger.info("[-] No scan results to report.")
+            print_status("[-] No scan results to report.", "warning")
             return
         total_hosts = len(self.results)
         total_ports = sum(len(data.get("ports", [])) for data in self.results.values())
         total_vulns = sum(self.count_vulnerabilities(data.get("vulnerabilities_ai", "")) for data in self.results.values())
-        logger.info(f"[+] Scan Summary: Hosts: {total_hosts}, Ports: {total_ports}, Vulnerabilities (AI): {total_vulns}")
+        print_status(f"[+] Scan Summary: Hosts: {total_hosts}, Ports: {total_ports}, Vulnerabilities (AI): {total_vulns}", "info")
         report_md += "**Scan Summary:**\n"
         report_md += f"- Hosts Scanned: {total_hosts}\n"
         report_md += f"- Ports Scanned: {total_ports}\n"
@@ -536,7 +536,7 @@ class ReportGenerator:
         report_md += "\n" + exec_summary + "\n"
         with open(self.output_path, "w") as f:
             f.write(report_md)
-        logger.info(f"[+] Report saved to {self.output_path}")
+        print_status(f"[+] Report saved to {self.output_path}", "success")
 
     @staticmethod
     def generate_executive_summary(results):
@@ -571,17 +571,14 @@ class ReportGenerator:
 
 
 def main():
+    print_banner("PRE-FLIGHT-CHECK")
     global PROJECT_FOLDER, logger, AUTO_MODE
-    smb_server = "192.168.8.239"
-    smb_share = "Media"
-    smb_user = ""
-    smb_pass = ""
     
     parser = argparse.ArgumentParser(
         description="Integrated PenTest Pre-Flight Check Tool with Custom Settings, XML Output, and Summary"
     )
-    parser.add_argument("-s", "--settings", help="Path to an XML file for custom settings")
-    parser.add_argument("--targets", help="Target IP range (e.g., 192.168.1.0/24)")
+    parser.add_argument("--settings", help="Path to an XML file for custom settings")
+    parser.add_argument("--project", help="Project Number")
     parser.add_argument("--ascii", action="store_true", help="Generate an ASCII map of scanned hosts and services")
     parser.add_argument("--output", default="raven_report.md", help="Output file for Markdown report")
     parser.add_argument("--mode", choices=["quick", "full"], default="quick", help="Scan mode: quick (top 100 ports) or full (all ports)")
@@ -597,10 +594,13 @@ def main():
     # Setup temporary logging until PROJECT_FOLDER is established.
     temp_log = "temp_preflight_log.txt"
     logger = setup_logging(temp_log)
-    logger.info("Unified logging is now configured (temporary).")
+    print_status("Unified logging is now configured (temporary).", "info")
 
     # Ask for project number.
-    proj_number = input("Enter Project Number (or press Enter to use default PR00000): ").strip()
+    if not args.project:
+        proj_number = input("Enter Project Number (or press Enter to use default PR00000): ").strip()
+    if args.project:
+        proj_number = args.project
     if not proj_number:
         proj_number = "PR00000"
     PROJECT_FOLDER = create_project_structure(proj_number)
@@ -608,7 +608,7 @@ def main():
     # Reinitialize logging using the project folder.
     log_file = os.path.join(PROJECT_FOLDER, "preflight_log.txt")
     logger = setup_logging(log_file)
-    logger.info("Unified logging is now configured (project folder).")
+    print_status("Unified logging is now configured (project folder).", "info")
 
     # --- Pre-Flight Operations ---
     preflight = PreFlightCheck(PROJECT_FOLDER)
@@ -616,6 +616,7 @@ def main():
     preflight.check_external_ip_validity()
     
     # Run pre-flight checks (for each scope type)
+    print_banner("Beginning Pre-Flight-Checks")
     int_scope_path = os.path.join(PROJECT_FOLDER, "int_scope.txt")
     ext_scope_path = os.path.join(PROJECT_FOLDER, "ext_scope.txt")
     web_scope_path = os.path.join(PROJECT_FOLDER, "web_scope.txt")
@@ -626,21 +627,22 @@ def main():
     preflight.print_summary()
 
     # Optionally perform SMB upload.
+    print_banner("SMB Upload")
     if prompt_yes_no("Do you want to upload the project folder to an SMB share? (y/n): ", AUTO_MODE) == 'y':
-        smb_pass = getpass.getpass("Enter SMB password (leave blank for none): ")
         zip_filename = os.path.join(PROJECT_FOLDER, os.path.basename(PROJECT_FOLDER) + ".zip")
         preflight.compress_project_folder(zip_filename)
-        logger.info(f"Zip file created: {zip_filename}")
+        print_status(f"Zip file created: {zip_filename}", "success")
         remote_path = os.path.join("Projects", os.path.basename(PROJECT_FOLDER))
-        preflight.upload_to_smb(zip_filename, smb_server, smb_share, remote_path, smb_user, smb_pass)
+        preflight.upload_to_smb(zip_filename, remote_path)
 
     # --- Active Scanning Phase ---
+    print_banner("Active Scanning Phase")
     # Build recon targets from internal and external scope files.
     recon_targets = " ".join(
         filter(None, [line.strip() for file in [int_scope_path, ext_scope_path]
                       if os.path.exists(file) for line in open(file)])
     )
-    logger.info(f"Recon targets: {recon_targets}")
+    print_status(f"Recon targets: {recon_targets}", "info")
     if recon_targets:
         if prompt_yes_no("Do you want to perform active testing? (y/n): ", AUTO_MODE) == 'y':
             # Instantiate RavenRecon with targets, output path, and scan mode.
@@ -649,32 +651,33 @@ def main():
             if live_hosts:
                 raven.scan_network(live_hosts)
             else:
-                logger.info("[-] No live hosts found. Exiting active scanning phase.")
+                print_status("[-] No live hosts found. Exiting active scanning phase.", "info")
         else:
-            logger.info("Active testing skipped by user.")
+            print_status("Active testing skipped by user.", "warning")
     else:
-        logger.info("[-] No recon targets found from scope files. Exiting active scanning phase.")
+        print_status("[-] No recon targets found from scope files. Exiting active scanning phase.", "warning")
         sys.exit(0)
 
     # --- Vulnerability Analytics Phase ---
+    print_banner("Vulnerability Analytics Phase")
     # Now, optionally perform AI analysis on each host.
     for host, info in raven.results.items():
         if prompt_yes_no(f"Perform AI analysis for {host}? (y/n): ", AUTO_MODE) == 'y':
-            logger.info(f"[+] Performing AI analysis for {host}.")
+            print_status(f"[+] Performing AI analysis for {host}.", "info")
             ai_result = raven.analyse_vulnerabilities(info)
             info["vulnerabilities_ai"] = ai_result
-            logger.info(f"[+] AI analysis completed for {host}.")
+            print_status(f"[+] AI analysis completed for {host}.", "success")
 
     # --- Reporting Phase ---
+    print_banner("Reporting Phase")
     # Generate the final report using ReportGenerator.
     reporting = ReportGenerator(raven.targets, raven.results, os.path.join(PROJECT_FOLDER, args.output))
     reporting.generate_report()
 
-
+    # --- ASCII Network Map Phase ---
+    print_banner("ASCII Network Map Phase")
     if args.ascii:
-        print(generate_ascii_visualisation(raven.results))
-
-
+        print_status(generate_ascii_visualisation(raven.results), "info")
 
 if __name__ == "__main__":
     main()

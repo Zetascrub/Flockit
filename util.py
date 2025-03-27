@@ -3,9 +3,11 @@ import re
 import json
 import ipaddress
 from collections import defaultdict
+import xml.etree.ElementTree as ET
 import logging
 import termios
 import requests
+from termcolor import cprint
 
 # --- Main Function ---
 AUTO_MODE = False  # Global flag for auto mode
@@ -63,15 +65,18 @@ def setup_logging(log_file):
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    file_handler = logging.FileHandler(log_file, mode='a')
-    file_handler.setFormatter(formatter)
+
+    # Remove all previous handlers
     if logger.hasHandlers():
         logger.handlers.clear()
-    logger.addHandler(console_handler)
+
+    # File handler only
+    file_handler = logging.FileHandler(log_file, mode='a')
+    file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
+
     return logger
+
 
 def lookup_vulnerabilities_for_port(port_data):
     service = port_data.get("service")
@@ -93,6 +98,7 @@ def lookup_vulnerabilities_for_port(port_data):
             return "Vulnerability lookup API returned an error."
     except Exception as e:
         return f"Error during vulnerability lookup: {e}"
+
 
 def generate_ascii_visualisation(results):
     """
@@ -132,3 +138,82 @@ def generate_ascii_visualisation(results):
         ascii_output.append("")  # Blank line between subnets
 
     return "\n".join(ascii_output)
+
+def print_status(msg, level="info"):
+    symbols = {
+        "info":    ("[~]", "cyan"),
+        "success": ("✅", "green"),
+        "warning": ("⚠️", "yellow"),
+        "error":   ("❌", "red"),
+        "scan":    ("🔍", "blue"),
+        "upload":  ("📤", "magenta"),
+        "report":  ("📄", "white"),
+    }
+    symbol, color = symbols.get(level, ("[~]", "white"))
+
+    # Terminal output
+    cprint(f"{symbol} {msg}", color, attrs=["bold"])
+
+    # Log file output
+    logger = logging.getLogger()
+    log_method = {
+        "info": logger.info,
+        "success": logger.info,
+        "warning": logger.warning,
+        "error": logger.error,
+        "scan": logger.info,
+        "upload": logger.info,
+        "report": logger.info,
+    }.get(level, logger.info)
+    log_method(msg)
+
+
+
+def print_banner(title):
+    cprint("\n" + "=" * 50, "blue", attrs=["bold"])
+    cprint(f"{title.center(50)}", "blue", attrs=["bold"])
+    cprint("=" * 50 + "\n", "blue", attrs=["bold"])
+
+
+def load_settings_xml(filepath="settings.xml"):
+    default_settings = {
+        "ports": [22, 80, 443, 445, 3389],
+        "timeout": 0.5,
+        "external_ip_url": "https://api.ipify.org",
+        "output_format": "XML",
+        "smb_server": "",
+        "smb_share": "",
+        "smb_username": ""
+    }
+
+    if not os.path.exists(filepath):
+        print_status("settings.xml not found. Using default settings.", "warning")
+        return default_settings
+
+    try:
+        tree = ET.parse(filepath)
+        root = tree.getroot()
+
+        ports = root.findtext("Ports")
+        timeout = root.findtext("Timeout")
+        external_ip_url = root.findtext("ExternalIPURL")
+        output_format = root.findtext("OutputFormat")
+
+        smb = root.find("SMB")
+        smb_server = smb.findtext("Server") if smb is not None else ""
+        smb_share = smb.findtext("Share") if smb is not None else ""
+        smb_username = smb.findtext("Username") if smb is not None else ""
+
+        return {
+            "ports": [int(p.strip()) for p in ports.split(",")] if ports else default_settings["ports"],
+            "timeout": float(timeout) if timeout else default_settings["timeout"],
+            "external_ip_url": external_ip_url or default_settings["external_ip_url"],
+            "output_format": output_format or default_settings["output_format"],
+            "smb_server": smb_server,
+            "smb_share": smb_share,
+            "smb_username": smb_username
+        }
+
+    except Exception as e:
+        print_status(f"Error loading settings.xml: {e}", "error")
+        return default_settings
