@@ -1,5 +1,7 @@
 # 🦅 Flockit - Modular Pentest Pre-Flight & Recon Tool
 
+<img src="flockit.png" alt="Logo" width="200">
+
 **Flockit** is a modular penetration testing assistant that automates the pre-engagement setup, basic recon, vulnerability enumeration, and report generation. Initially built for validating scope and reachability, it has grown into a full multi-phase toolset with support for plugins, AI-driven analysis, and team-friendly outputs.
 
 ---
@@ -11,6 +13,10 @@
 - Smart, Not Noisy: Flockit doesn't just scan—it organises, interprets, and documents.
 - Built for Teams: Project folder structure and plugin architecture make it easy to hand off or scale.
 - Modular as Flock: Swap in custom plugins, use XML/Markdown outputs, or integrate into your own workflow.
+
+## Demo
+
+![Demo](Demo.gif)
 
 
 ## 🚀 Key Features
