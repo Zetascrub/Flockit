@@ -86,10 +86,6 @@ class MyCustomPlugin(ScanPlugin):
         return "Hello from plugin"
 ```
 
-## Demo
-
-![Demo](demo.gif)
-
 # 🧪 Usage
 
 ## ⟲ Basic Usage
