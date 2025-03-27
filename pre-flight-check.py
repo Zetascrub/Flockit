@@ -1,96 +1,3 @@
-# Roadmap and Planning for Version 0.6
-# ====================================
-
-VERSION = "0.6"
-
-## Planned Features:
-FEATURES = [
-    "Auto-Generated Executive Summary",
-    "Passive Recon Integration (WHOIS / DNS Records)",
-    "AI Mode Upgrades (Improved remediation & severity tagging)",
-    "ASCII Visualisation (Map-style network layout output)",
-    "Auto Mode (Proceed through the script automatically)"
-]
-
-# Feature Breakdown & To-Do Checklist
-FEATURE_TODOS = {
-    "Auto-Generated Executive Summary": [
-        "[x] Add a summary section to the end of the RavenRecon report",
-        "[x] Include stats: total hosts, total ports scanned, vulnerabilities found",
-        "[x] Auto-generate bullet points with highlights (e.g., \"X hosts have RDP exposed\")",
-        "[x] Save summary in markdown and optionally plain text"
-    ],
-    "Passive Recon Integration (WHOIS / DNS Records)": [
-        "[ ] When scanning external or web targets, run WHOIS lookup",
-        "[ ] Run DNS lookups (A, MX, TXT, CNAME records) for domains",
-        "[ ] Parse WHOIS results and extract useful fields (org, country, registrar)",
-        "[ ] Include results in scan_results.xml and markdown report"
-    ],
-    "AI Mode Upgrades": [
-        "[x] Basic AI vulnerability analysis using Ollama is integrated",
-        "[ ] Add severity levels (Low, Medium, High) in AI response parser",
-        "[ ] Use markdown formatting to highlight severity",
-        "[ ] Use scoring or keyword detection to generate risk level",
-        "[ ] Optionally colour-code output if terminal supports it"
-    ],
-    "ASCII Visualisation (Map-style network layout output)": [
-        "[ ] Use terminal ASCII art to show live hosts discovered",
-        "[ ] Group hosts by subnet for a visual layout (e.g., 192.168.1.x block)",
-        "[ ] Display service icons (e.g., HTTP, SMB, RDP) next to hosts",
-        "[ ] Add an optional flag (--ascii) to enable visual output"
-    ],
-    "Auto Mode (Proceed through the script automatically)": [
-        "[x] Implement a command-line flag (--auto) to enable auto mode",
-        "[x] Refactor all yes/no prompts to use a helper function (prompt_yes_no) that auto-answers 'y' in auto mode",
-        "[x] Ensure auto mode bypasses interactive inputs without compromising essential configuration (e.g., SMB credentials are still securely entered)",
-        "[x] Test auto mode thoroughly in various parts of the workflow (SMB upload, AI analysis prompt, etc.)"
-    ]
-}
-
-
-"""
-## Changelog
-
-v0.6
-- Refactored code into separate classes: PreFlightCheck, RavenRecon, and ReportGenerator.
-- Decoupled AI vulnerability analysis from active scanning; now it can be triggered as a separate phase.
-- Integrated auto mode (--auto) across the workflow, refactoring prompts to use a helper function.
-- Improved modularity and separation of concerns for pre-flight checks, active scanning, and reporting.
-
-v0.5.1
-- Resolved terminal input visibility issue using `termios` and `atexit` to restore original settings.
-- Switched SMB password input to use `getpass.getpass()` for enhanced security.
-- Improved logging: Replaced `print()` with a unified `logger` for both console and file outputs.
-- Fixed user prompt order during AI analysis input to avoid invisible text.
-- Ensured all output paths use the PROJECT_FOLDER context (e.g., for reports and ZIP files).
-
-v0.5
-- Added AI-powered vulnerability analysis using Ollama + LLaMA 3 based on scan results.
-- Introduced plugin architecture: dynamic loading from the 'plugins/' folder, with plugins subclassing `ScanPlugin`.
-- Implemented service banner grabbing via socket connections.
-- Added CVE lookup via cve.circl.lu API using discovered services/versions.
-- Created the `RavenRecon` class to modularize scanning, reporting, and analysis.
-
-v0.4
-- Added project folder compression to a ZIP archive before SMB upload.
-- Updated SMB upload to send the zipped archive only (instead of raw folder contents).
-
-v0.3
-- Automatically created `Screenshots` and `Scan-Data` folders inside the project directory.
-- Built the SMB remote upload path using the project folder name.
-
-v0.2
-- Parsed `scope.txt` and split it into `int_scope.txt`, `ext_scope.txt`, and `web_scope.txt`.
-- Initial support for SMB upload using Impacket SMBConnection.
-- Added terminal summary output and created `summary.txt` with results.
-
-v0.1
-- Initial release: port scanner using `nmap` + `socket`, with XML output.
-- Supported custom settings via an XML configuration (ports, timeout, external IP URL).
-- Differentiated between internal and external IPs for scanning scope.
-"""
-
-
 #!/usr/bin/env python3
 import sys
 import ipaddress
@@ -110,6 +17,9 @@ import ollama
 import atexit
 import getpass
 from util import *
+ 
+
+version = "6.1"
 
 # Global variables for custom settings and scan results
 CUSTOM_SETTINGS = {
@@ -672,6 +582,7 @@ def main():
     )
     parser.add_argument("-s", "--settings", help="Path to an XML file for custom settings")
     parser.add_argument("--targets", help="Target IP range (e.g., 192.168.1.0/24)")
+    parser.add_argument("--ascii", action="store_true", help="Generate an ASCII map of scanned hosts and services")
     parser.add_argument("--output", default="raven_report.md", help="Output file for Markdown report")
     parser.add_argument("--mode", choices=["quick", "full"], default="quick", help="Scan mode: quick (top 100 ports) or full (all ports)")
     parser.add_argument("--auto", action="store_true", help="Enable auto mode (all prompts default to yes)")
@@ -758,6 +669,10 @@ def main():
     # Generate the final report using ReportGenerator.
     reporting = ReportGenerator(raven.targets, raven.results, os.path.join(PROJECT_FOLDER, args.output))
     reporting.generate_report()
+
+
+    if args.ascii:
+        print(generate_ascii_visualisation(raven.results))
 
 
 

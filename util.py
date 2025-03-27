@@ -1,6 +1,8 @@
 import os
 import re
 import json
+import ipaddress
+from collections import defaultdict
 import logging
 import termios
 import requests
@@ -91,3 +93,42 @@ def lookup_vulnerabilities_for_port(port_data):
             return "Vulnerability lookup API returned an error."
     except Exception as e:
         return f"Error during vulnerability lookup: {e}"
+
+def generate_ascii_visualisation(results):
+    """
+    Generate an ASCII visual representation of scanned hosts and their services.
+    Grouped by /24 subnet.
+    """
+    subnet_groups = defaultdict(list)
+
+    # Group hosts by /24 subnet
+    for host, data in results.items():
+        try:
+            net = ipaddress.IPv4Network(host + '/24', strict=False)
+            subnet_groups[str(net)].append((host, data))
+        except ValueError:
+            continue
+
+    ascii_output = []
+    ascii_output.append("\n======= ASCII Network Map =======\n")
+
+    for subnet, hosts in sorted(subnet_groups.items()):
+        ascii_output.append(f"Subnet: {subnet}")
+        for host, data in sorted(hosts):
+            line = f"[{host}]"
+            services = [
+                port.get("service", "unknown").upper()
+                for port in data.get("ports", [])
+                if port.get("state") == "open"
+            ]
+            if services:
+                branches = [f" ──┬─ [{services[0]}]"]
+                for svc in services[1:]:
+                    branches.append(f"   ├─ [{svc}]")
+                line += "\n" + "\n".join(branches)
+            else:
+                line += " ── No services detected"
+            ascii_output.append(line)
+        ascii_output.append("")  # Blank line between subnets
+
+    return "\n".join(ascii_output)
