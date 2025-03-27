@@ -36,140 +36,32 @@ This project provides a pre-flight check tool for penetration testing, written i
   - Exports the files to an SMB share using credentials provided via `settings.xml` and prompts for the password.
 
 
+## Writing Custom Plugins
+
+You can extend the scanner by writing plugins that inherit from `ScanPlugin`.
+
+Each plugin must define:
+- `name`: A unique string identifier.
+- `should_run(host, port, port_data)`: Return `True` to run on a given port.
+- `run(host, port, port_data)`: Perform the custom scan and return a string.
+
+### Example Plugin File: `plugins/my_custom_plugin.py`
+
+```python
+class MyCustomPlugin(ScanPlugin):
+    name = "my_custom_plugin"
+
+    def should_run(self, host, port, port_data):
+        return port == 8080
+
+    def run(self, host, port, port_data):
+        return "Hello from plugin"
+```
+
 ## Demo
 
-```bash
-python3 pre-flight-check_0.6.py --auto --ascii --project PR00012
+![Demo](Demo.gif)
 
-==================================================
-                 PRE-FLIGHT-CHECK                 
-==================================================
-
-[~] Unified logging is now configured (temporary).
-[~] Unified logging is now configured (project folder).
-[~] Created int_scope.txt with 3 entries (Internal IPs).
-⚠️ No external IPs found; ext_scope.txt not created.
-⚠️ No website URLs found; web_scope.txt not created.
-[~] [+] External IP 82.147.10.194 is valid for testing.
-
-==================================================
-           Beginning Pre-Flight-Checks            
-==================================================
-
-[~] [*] Running pre-flight checks for: INT
-[~] [~] 192.168.8.1 [IP]
-[~] Tagged scope entry: 192.168.8.1 [IP]
-[~] [*] Scanning common ports on 192.168.8.1...
-[~] [+] Open ports on 192.168.8.1: [22, 80, 443]
-[~] [~] 192.168.8.2 [IP]
-[~] Tagged scope entry: 192.168.8.2 [IP]
-[~] [*] Scanning common ports on 192.168.8.2...
-[~] [-] No common ports open on 192.168.8.2
-[~] [~] 192.168.8.239 [IP]
-[~] Tagged scope entry: 192.168.8.239 [IP]
-[~] [*] Scanning common ports on 192.168.8.239...
-[~] [+] Open ports on 192.168.8.239: [80, 443, 445]
-✅ [+] INT pre-flight checks passed.
-
-[~] [*] Running pre-flight checks for: EXT
-[~] [+] External IP Address: 82.147.10.194
-⚠️ [-] Skipping EXT checks due to no entries.
-[~] [*] Running pre-flight checks for: WEB
-[~] [+] External IP Address: 82.147.10.194
-⚠️ [-] Skipping WEB checks due to no entries.
-✅ Scan results written to PR00012/scan_results.xml
-[~] 
-==================================================
-Summary:
-Host                 | Status                        
---------------------------------------------------
-192.168.8.1          | Responded (ports: 22, 80, 443)
-192.168.8.2          | Not Responded                 
-192.168.8.239        | Responded (ports: 80, 443, 445)
-==================================================
-✅ Summary written to PR00012/summary.txt
-
-==================================================
-                    SMB Upload                    
-==================================================
-
-✅ Zip file created: PR00012/PR00012.zip
-Enter SMB password (leave blank for none): 
-[~] Connected to 192.168.8.239 on share Media
-📤 Uploading PR00012/PR00012.zip to Projects/PR00012/PR00012.zip...
-✅ Upload completed successfully.
-
-==================================================
-              Active Scanning Phase               
-==================================================
-
-[~] Recon targets: 192.168.8.1 192.168.8.2 192.168.8.239
-[~] [+] Ollama service is running (version check)
-⚠️ [-] Plugins directory 'plugins' not found. Skipping external plugins.
-[~] [+] Discovering live hosts in 192.168.8.1 192.168.8.2 192.168.8.239...
-[~] [+] Found 2 live hosts
-[~] [+] Scanning network for open ports and services...
-[~] [+] Starting scan on 192.168.8.1 with arguments: -F
-[~] [+] Starting scan on 192.168.8.239 with arguments: -F
-[~] [+] Scanning port 80 on 192.168.8.239...
-[~] [+] Grabbing banner for 192.168.8.239:80...
-[~] [+] Scanning port 111 on 192.168.8.239...
-[~] [+] Grabbing banner for 192.168.8.239:111...
-[~] [+] Scanning port 22 on 192.168.8.1...
-[~] [+] Grabbing banner for 192.168.8.1:22...
-[~] [+] Scanning port 53 on 192.168.8.1...
-[~] [+] Grabbing banner for 192.168.8.1:53...
-[~] [+] Scanning port 139 on 192.168.8.239...
-❌ [-] Exception scanning 192.168.8.239: ('192.168.8.239',)
-✅ [+] Scan completed for 192.168.8.239
-[~] [+] Scanning port 80 on 192.168.8.1...
-[~] [+] Grabbing banner for 192.168.8.1:80...
-[~] [+] Scanning port 443 on 192.168.8.1...
-[~] [+] Grabbing banner for 192.168.8.1:443...
-[~] [+] Scanning port 3000 on 192.168.8.1...
-[~] [+] Grabbing banner for 192.168.8.1:3000...
-[~] [+] Scanning port 8080 on 192.168.8.1...
-[~] [+] Grabbing banner for 192.168.8.1:8080...
-[~] [+] Scanning port 8443 on 192.168.8.1...
-[~] [+] Grabbing banner for 192.168.8.1:8443...
-✅ [+] Scan completed for 192.168.8.1
-
-==================================================
-          Vulnerability Analytics Phase           
-==================================================
-
-[~] [+] Performing AI analysis for 192.168.8.239.
-✅ [+] AI analysis completed for 192.168.8.239.
-[~] [+] Performing AI analysis for 192.168.8.1.
-✅ [+] AI analysis completed for 192.168.8.1.
-
-==================================================
-                 Reporting Phase                  
-==================================================
-
-[~] [+] Generating report...
-[~] [+] Scan Summary: Hosts: 2, Ports: 7, Vulnerabilities (AI): 0
-✅ [+] Report saved to PR00012/raven_report.md
-
-==================================================
-             ASCII Network Map Phase              
-==================================================
-
-[~] 
-======= ASCII Network Map =======
-
-Subnet: 192.168.8.0/24
-[192.168.8.1]
- ──┬─ [SSH]
-   ├─ [DOMAIN]
-   ├─ [HTTP]
-   ├─ [HTTPS]
-   ├─ [PPP]
-   ├─ [HTTP-PROXY]
-   ├─ [HTTPS-ALT]
-[192.168.8.239] ── No services detected
-
-```
 
 ## Requirements
 
