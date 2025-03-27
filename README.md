@@ -2,6 +2,8 @@
 
 **Flockit** is a modular penetration testing assistant that automates the pre-engagement setup, basic recon, vulnerability enumeration, and report generation. Initially built for validating scope and reachability, it has grown into a full multi-phase toolset with support for plugins, AI-driven analysis, and team-friendly outputs.
 
+<img src="flockit.png" alt="Logo" width="200">
+
 ---
 
 # 🤔 Why Flockit?
