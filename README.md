@@ -1,10 +1,7 @@
-# PenTest Pre-Flight Check Tool
+# 🦅 Flockit - Modular Pentest Pre-Flight & Recon Tool
 
-This project provides a pre-flight check tool for penetration testing, written in Python. It reads a single `scope.txt` file, automatically splits it into internal, external, and web scope files, and then runs various pre-flight checks (e.g. port scanning, external IP retrieval). It also supports custom settings via an XML file (`settings.xml`) and outputs the scan results in XML format.
+Flockit is a modular penetration testing assistant that automates the pre-engagement setup, basic recon, vulnerability enumeration, and report generation. Initially built for validating scope and reachability, it has grown into a full multi-phase toolset with support for plugins, AI-driven analysis, and team-friendly outputs.
 
-## Demo
-
-![Demo](Demo.gif)
 
 ## Features
 
@@ -60,6 +57,11 @@ class MyCustomPlugin(ScanPlugin):
     def run(self, host, port, port_data):
         return "Hello from plugin"
 ```
+
+## Demo
+
+![Demo](demo.gif)
+
 
 ## Requirements
 
