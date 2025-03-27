@@ -127,28 +127,39 @@ class PreFlightCheck:
             print_status("No website URLs found; web_scope.txt not created.","warning")
 
     def check_external_ip_validity(self):
-        ext_ip = requests.get(CUSTOM_SETTINGS["external_ip_url"]).text
-        logger = logging.getLogger()
+        ext_ip = requests.get(CUSTOM_SETTINGS["external_ip_url"]).text.strip()
         if not ext_ip:
             return ""
-        valid_networks = [
-            ipaddress.ip_network("82.147.10.208/28"),
-            ipaddress.ip_network("82.147.10.192/28")
-        ]
+
+        # Parse valid ranges from settings
+        raw_ranges = CUSTOM_SETTINGS.get("valid_external_ranges", [])
+        valid_networks = []
+        for net_str in raw_ranges:
+            try:
+                valid_networks.append(ipaddress.ip_network(net_str))
+            except ValueError:
+                print_status(f"Invalid network in settings.xml: {net_str}", "warning")
+
+
         try:
             ip_obj = ipaddress.ip_address(ext_ip)
         except ValueError:
-            print_status("[-] Invalid external IP format received.", "error")
+            print_status("Invalid external IP format received.", "error")
             return ext_ip
+
         if any(ip_obj in net for net in valid_networks):
-            print_status(f"[+] External IP {ext_ip} is valid for testing.", "info")
+            print_status(f"External IP {ext_ip} is valid for testing.", "success")
         else:
-            print_status(f"[-] Warning: External IP {ext_ip} is not within the valid testing ranges.", "warning")
+            print_status(f"Warning: External IP {ext_ip} is not within the valid testing ranges.", "warning")
+            
             choice = prompt_yes_no("Do you want to continue anyway? (y/n): ", AUTO_MODE)
             if choice != 'y':
                 print_status("User chose to exit due to invalid external IP.", "info")
                 sys.exit("Exiting. Please connect to the VPN and try again.")
+
         return ext_ip
+
+
 
     def compress_project_folder(self, zip_filename):
         with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -496,6 +507,19 @@ class RavenRecon:
     def count_vulnerabilities(self, vulnerabilities_text):
         return len(re.findall(r'\*\*Vulnerability \d+:', vulnerabilities_text))
 
+# --- Plugin Class ---
+class ScanPlugin:
+    """
+    Base class for scan plugins.
+    Each plugin should define a unique name, a condition (should_run) and execution logic (run).
+    """
+    name = "base_plugin"
+
+    def should_run(self, host, port, port_data):
+        return False
+
+    def run(self, host, port, port_data):
+        return None
 
 # --- ReportGenerator Class ---
 class ReportGenerator:
@@ -591,10 +615,6 @@ def main():
     original_term_settings = termios.tcgetattr(fd)
     atexit.register(restore_terminal_settings, fd, original_term_settings)
 
-    # Setup temporary logging until PROJECT_FOLDER is established.
-    temp_log = "temp_preflight_log.txt"
-    logger = setup_logging(temp_log)
-    print_status("Unified logging is now configured (temporary).", "info")
 
     # Ask for project number.
     if not args.project:
@@ -603,12 +623,14 @@ def main():
         proj_number = args.project
     if not proj_number:
         proj_number = "PR00000"
-    PROJECT_FOLDER = create_project_structure(proj_number)
 
     # Reinitialize logging using the project folder.
     log_file = os.path.join(PROJECT_FOLDER, "preflight_log.txt")
     logger = setup_logging(log_file)
-    print_status("Unified logging is now configured (project folder).", "info")
+    print_status(f"Unified logging is now configured {proj_number}.", "info")
+
+    PROJECT_FOLDER = create_project_structure(proj_number)
+
 
     # --- Pre-Flight Operations ---
     preflight = PreFlightCheck(PROJECT_FOLDER)

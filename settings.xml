@@ -5,8 +5,15 @@
     <OutputFormat>XML</OutputFormat>
 
     <SMB>
-        <Server>[IP/HOST NAME]</Server>
-        <Share>[SHARE NAME]</Share>
-        <Username>[USER NAME]</Username>
+        <Server>192.168.8.239</Server>
+        <Share>Media</Share>
+        <Username>""</Username>
     </SMB>
+
+    <ValidExternalRanges>
+        <Range>82.147.10.192/28</Range>
+        <Range>82.147.10.208/28</Range>
+    </ValidExternalRanges>
+
+
 </Settings>

@@ -183,7 +183,8 @@ def load_settings_xml(filepath="settings.xml"):
         "output_format": "XML",
         "smb_server": "",
         "smb_share": "",
-        "smb_username": ""
+        "smb_username": "",
+        "valid_external_ranges": []
     }
 
     if not os.path.exists(filepath):
@@ -204,6 +205,9 @@ def load_settings_xml(filepath="settings.xml"):
         smb_share = smb.findtext("Share") if smb is not None else ""
         smb_username = smb.findtext("Username") if smb is not None else ""
 
+        # NEW: Parse valid external IP ranges
+        valid_ranges = [r.text.strip() for r in root.findall(".//ValidExternalRanges/Range") if r.text]
+
         return {
             "ports": [int(p.strip()) for p in ports.split(",")] if ports else default_settings["ports"],
             "timeout": float(timeout) if timeout else default_settings["timeout"],
@@ -211,9 +215,11 @@ def load_settings_xml(filepath="settings.xml"):
             "output_format": output_format or default_settings["output_format"],
             "smb_server": smb_server,
             "smb_share": smb_share,
-            "smb_username": smb_username
+            "smb_username": smb_username,
+            "valid_external_ranges": valid_ranges or default_settings["valid_external_ranges"]
         }
 
     except Exception as e:
         print_status(f"Error loading settings.xml: {e}", "error")
         return default_settings
+
