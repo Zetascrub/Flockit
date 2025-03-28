@@ -1,5 +1,5 @@
 from modules.plugins import ScanPlugin
-from util import print_status
+from utils.common import print_status
 import socket
 
 class FTPScan(ScanPlugin):

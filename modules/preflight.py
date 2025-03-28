@@ -3,7 +3,9 @@ import re
 import sys
 import zipfile
 import ipaddress
+import socket
 import requests
+import datetime
 import xml.etree.ElementTree as ET
 
 from utils.common import *
@@ -17,8 +19,11 @@ class PreFlight:
         self.project_folder = project_folder
 
     def setup(self):
+        if not os.path.exists(self.project_folder):
+            os.makedirs(self.project_folder)
         self.split_scope_file()
         self.check_external_ip_validity()
+
 
     def split_scope_file(self):
         MAIN_SCOPE_FILE = "scope.txt"
@@ -138,7 +143,7 @@ class PreFlight:
         else:
             print_status(f"Warning: External IP {ext_ip} is not within the valid testing ranges.", "warning")
             
-            choice = prompt_yes_no("Do you want to continue anyway? (y/n): ", AUTO_MODE)
+            choice = prompt_yes_no("Do you want to continue anyway? (y/n): ", AUTO["mode"])
             if choice != 'y':
                 print_status("User chose to exit due to invalid external IP.", "info")
                 sys.exit("Exiting. Please connect to the VPN and try again.")
@@ -147,7 +152,7 @@ class PreFlight:
 
     def prompt_smb_upload(self):
         print_banner("SMB Upload")
-        return prompt_yes_no("Do you want to upload the project folder to an SMB share? (y/n): ", AUTO_MODE)
+        return prompt_yes_no("Do you want to upload the project folder to an SMB share? (y/n): ", AUTO["mode"])
 
     def compress_and_upload(self):
         zip_filename = os.path.join(self.project_folder, os.path.basename(self.project_folder) + ".zip")
@@ -217,12 +222,12 @@ class PreFlight:
 
     def prompt_recon(self):
         print_banner("Active Scanning Phase")
-        return prompt_yes_no("Do you want to perform active testing? (y/n): ", AUTO_MODE)
+        return prompt_yes_no("Do you want to perform active testing? (y/n): ", AUTO["mode"])
 
     def prompt_ai(self):
         print_banner("Vulnerability Analytics Phase")
         print_status("This may take some time", "info")
-        return prompt_yes_no("Do you want to perform AI vulnerability analysis? (y/n): ", AUTO_MODE)
+        return prompt_yes_no("Do you want to perform AI vulnerability analysis? (y/n): ", AUTO["mode"])
 
     def port_scan(self, ip):
         """Scan a set of common ports on the given IP address using custom settings.

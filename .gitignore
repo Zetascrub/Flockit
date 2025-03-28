@@ -1,8 +1,10 @@
-modules/__pycache__
 __pycache__
+modules/__pycache__
+modules/plugins/__pycache__
 scope.txt
 venv
 Old/*
 settings.xml
 PR0*
 flockit_dev*
+.vscode/*

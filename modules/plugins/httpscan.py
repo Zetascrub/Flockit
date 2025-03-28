@@ -1,6 +1,6 @@
 from modules.plugins import ScanPlugin
 import socket
-from util import print_status 
+from utils.common import print_status 
 
 import socket
 

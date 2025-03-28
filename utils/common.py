@@ -10,7 +10,7 @@ import requests
 from termcolor import cprint
 
 # --- Main Function ---
-AUTO_MODE = False  # Global flag for auto mode
+AUTO = {"mode": False}  # Global config object
 
 def restore_terminal_settings(fd, original_term_settings):
     termios.tcsetattr(fd, termios.TCSADRAIN, original_term_settings)
@@ -30,7 +30,9 @@ def is_domain(entry):
         return True
     return False
 
-def prompt_yes_no(prompt, auto_mode=False):
+def prompt_yes_no(prompt, auto_mode=None):
+    if auto_mode is None:
+        auto_mode = AUTO["mode"]
     if auto_mode:
         return 'y'
     return input(prompt).strip().lower()
