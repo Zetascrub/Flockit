@@ -5,9 +5,9 @@
     <OutputFormat>XML</OutputFormat>
 
     <SMB>
-        <Server>192.168.8.239</Server>
-        <Share>Media</Share>
-        <Username>""</Username>
+        <Server>HOST</Server>
+        <Share>SHARE</Share>
+        <Username>USER</Username>
     </SMB>
 
     <ValidExternalRanges>
