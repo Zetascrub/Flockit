@@ -5,8 +5,8 @@
     <OutputFormat>XML</OutputFormat>
 
     <SMB>
-        <Server>[IP]</Server>
-        <Share>[Share Name]</Share>
+        <Server>192.168.8.239</Server>
+        <Share>Media</Share>
         <Username>""</Username>
     </SMB>
 
