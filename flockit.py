@@ -12,6 +12,7 @@ import argparse
  
 
 version = "0.6.3"
+# Test
 
 # Global variables for custom settings and scan results
 CUSTOM_SETTINGS = load_settings_xml()
