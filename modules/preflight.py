@@ -5,7 +5,8 @@ import zipfile
 import ipaddress
 import socket
 import requests
-import datetime
+import xml.dom.minidom as md
+from datetime import datetime
 import xml.etree.ElementTree as ET
 
 from utils.common import *
@@ -14,6 +15,9 @@ import getpass
 from impacket.smbconnection import SMBConnection
 
 # --- Sets up project folder & scope ---
+
+SCAN_RESULTS = {}
+
 class PreFlight:
     def __init__(self, project_folder):
         self.project_folder = project_folder
@@ -152,7 +156,7 @@ class PreFlight:
 
     def prompt_smb_upload(self):
         print_banner("SMB Upload")
-        return prompt_yes_no("Do you want to upload the project folder to an SMB share? (y/n): ", AUTO["mode"])
+        return prompt_yes_no("Do you want to upload the project folder to an SMB share? (y/n): ", "upload")
 
     def compress_and_upload(self):
         zip_filename = os.path.join(self.project_folder, os.path.basename(self.project_folder) + ".zip")
@@ -227,7 +231,8 @@ class PreFlight:
     def prompt_ai(self):
         print_banner("Vulnerability Analytics Phase")
         print_status("This may take some time", "info")
-        return prompt_yes_no("Do you want to perform AI vulnerability analysis? (y/n): ", AUTO["mode"])
+        return prompt_yes_no("Do you want to perform AI vulnerability analysis? (y/n): ", "ai_analysis")
+
 
     def port_scan(self, ip):
         """Scan a set of common ports on the given IP address using custom settings.
@@ -288,7 +293,7 @@ class PreFlight:
         xml_str = ET.tostring(root, encoding="utf-8")
         parsed_xml = md.parseString(xml_str)
         pretty_xml = parsed_xml.toprettyxml(indent="  ")
-        xml_file = os.path.join(PROJECT_FOLDER, "scan_results.xml")
+        xml_file = os.path.join(self.project_folder, "scan_results.xml")
         with open(xml_file, "w") as f:
             f.write(pretty_xml)
         print_status(f"Scan results written to {xml_file}", "success")
@@ -327,7 +332,7 @@ class PreFlight:
         print_status("\n" + summary_str, "info")
         
         # Write summary to summary.txt in the project folder
-        summary_file = os.path.join(PROJECT_FOLDER, "summary.txt")
+        summary_file = os.path.join(self.project_folder, "summary.txt")
         try:
             with open(summary_file, "w") as f:
                 f.write(summary_str)

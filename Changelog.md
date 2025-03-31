@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the **Pre-Flight Check Tool** will be documented in this file.
+All notable changes to the **Flockit** will be documented in this file.
 
 ---
 
@@ -8,6 +8,7 @@ All notable changes to the **Pre-Flight Check Tool** will be documented in this 
 - Passive Recon: WHOIS and DNS record lookups with parser integration.
 - Severity tagging and markdown colourisation in AI output.
 - Potential project name change
+- Move checks to the start of the script (Ollama, Nmap, etc)
 ---
 
 ## [0.6.2]
