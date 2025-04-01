@@ -9,7 +9,7 @@ import importlib.util
 import inspect
 import requests
 
-from utils.common import print_status, lookup_vulnerabilities_for_port, check_ollama, ollama_chat, AUTO, save_scan_output
+from utils.common import print_status, lookup_vulnerabilities_for_port, check_ollama, ollama_chat, AUTO, save_scan_output, logging
 from modules.plugins import ScanPlugin
 from modules.magpie import Magpie
 
