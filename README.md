@@ -1,185 +1,162 @@
-# 🦅 Flockit - Modular Pentest Pre-Flight & Recon Tool
+# 🧰 Flock-It: Integrated Pentest Framework
 
-<img src="flockit.png" alt="Logo" width="200">
-
-**Flockit** is a modular penetration testing assistant that automates the pre-engagement setup, basic recon, vulnerability enumeration, and report generation. Initially built for validating scope and reachability, it has grown into a full multi-phase toolset with support for plugins, AI-driven analysis, and team-friendly outputs.
+Flock-It is an all-in-one pentest automation framework designed to streamline the recon, scanning, and reporting process for internal, external, and web application testing. It supports plugin-based extensibility and AI integration for enhanced remediation and vulnerability context.
 
 ---
 
-# 🤔 Why Flockit?
+## 🚀 Features
 
-- Bird-Themed Modules: PreFlight checks, RavenRecon, and Owl reporting—each inspired by speed, intelligence, and vision.
-- From Boot to Report: Designed for real-world pentesters to get from scope file to upload in minutes.
-- Smart, Not Noisy: Flockit doesn't just scan—it organises, interprets, and documents.
-- Built for Teams: Project folder structure and plugin architecture make it easy to hand off or scale.
-- Modular as Flock: Swap in custom plugins, use XML/Markdown outputs, or integrate into your own workflow.
+- 🧪 Internal, external, and web recon support
+- 🔌 Plugin-based architecture
+- 🪄 Auto-generates custom plugins using LLM (Ollama)
+- 🧠 AI-enhanced reporting and remediation context
+- 📦 Auto SMB uploads to shared drives
+- 🗂️ Structured scan and report directories per project
+- 🖼️ ASCII network visualization
+- 🔍 Scope-based scanning via `scope.txt`
 
-## Demo
+---
 
-![Demo](Demo.gif)
-
-
-## 🚀 Key Features
-
-### 🧽 Pre-Flight Checks
-- Parses `scope.txt` and auto-generates:
-  - `int_scope.txt` (Internal IPs)
-  - `ext_scope.txt` (External IPs)
-  - `web_scope.txt` (Web targets)
-- Expands IP ranges (e.g., `192.168.8.1-10`)
-- Classifies domains and CIDR blocks intelligently
-
-### 🔍 Raven (Active Scanning)
-- Pings internal and external hosts to determine availability
-- Performs port scanning with options for quick (`-F`) or full (`-p-`) modes
-- Supports threaded scanning with banner grabbing
-- Plugin system for service-specific checks (e.g. HTTP, SSH, SMB)
-
-### 🤖 Owl (Reporting & AI Analysis)
-- Auto-generates Markdown reports with:
-  - Host summaries
-  - Service details
-  - Plugin findings
-  - AI-based vulnerability analysis via Ollama
-- Optional ASCII visualisation for quick subnet views
-
-### ⚙️ Plugin Support
-- Drop-in plugin files into the `modules/plugins/` folder
-- Each plugin inherits from `ScanPlugin` located in `modules/plugins/__init__.py`
-- Custom output can be included per-service/port
-
-### 🛠️ Custom Settings
-- Load scanning config from `settings.xml`:
-
-  ```xml
-  <settings>
-    <Ports>22,80,443,445,3389</Ports>
-    <Timeout>0.5</Timeout>
-    <ExternalIPURL>https://api.ipify.org</ExternalIPURL>
-    <OutputFormat>XML</OutputFormat>
-    <ValidRanges>
-      <Range>82.147.10.192/28</Range>
-      <Range>82.147.10.208/28</Range>
-    </ValidRanges>
-    <SMB>
-      <Server>fileshare.local</Server>
-      <Share>Projects</Share>
-      <Username>tester</Username>
-    </SMB>
-  </settings>
-
-
-
-## Writing Custom Plugins
-
-You can extend the scanner by writing plugins that inherit from `ScanPlugin`.
-
-Each plugin must define:
-- `name`: A unique string identifier.
-- `should_run(host, port, port_data)`: Return `True` to run on a given port.
-- `run(host, port, port_data)`: Perform the custom scan and return a string.
-
-### Example Plugin File: `plugins/my_custom_plugin.py`
-
-```python
-class MyCustomPlugin(ScanPlugin):
-    name = "my_custom_plugin"
-
-    def should_run(self, host, port, port_data):
-        return port == 8080
-
-    def run(self, host, port, port_data):
-        return "Hello from plugin"
-```
-
-## Demo
-
-![Demo](demo.gif)
-
-# 🧪 Usage
-
-## ⟲ Basic Usage
-
-```bash
-python3 flockit.py
-```
-
-## ⚡ Auto Mode (No Prompts)
-
-```bash
-python3 flockit.py --auto --project PR00099 --mode full
-```
-
-# 📄 Example Scope
-
-```bash
-192.168.8.1
-192.168.8.10-15
-example.com
-192.168.9.0/24
-```
-
-
-## Script Process
-
-1. Creates a project folder (e.g. PR00000) with subfolders for Screenshots and Scan-Data.
-
-2. Splits `scope.txt` into `int_scope.txt`, `ext_scope.txt`, and `web_scope.txt` (only if entries exist).
-
-3. Runs pre-flight checks (port scanning for IPs, external IP retrieval, etc.) based on the scope.
-
-4. Generates an XML output file (`scan_results.xml`) with all scan details.
-
-5. Logs all events in `preflight_log.txt`.
-
-6. Uploads results to SMB share (password is prompted securely).
-
-🗂 Output Overview
-
-After running the script, the project folder (e.g. PR00000) will be created with the following structure:
+## 🗂️ Example Project Output Structure
 
 ```
 PR00099/
 ├── int_scope.txt
 ├── ext_scope.txt
 ├── web_scope.txt
+├── summary.txt
 ├── scan_results.xml
-├── raven_report.md
-├── preflight_log.txt
+├── report.md
 ├── Screenshots/
 └── Scan-Data/
-
+    └── 192.168.8.1/
+        ├── banner_22.txt
+        ├── http_80_output.json
+        ├── ssh_22_output.json
+        ├── nmap.csv
+        └── ...
 ```
 
-## Requirements
+---
 
-- Python 3.x
-- [requests](https://pypi.org/project/requests/)
-- [termcolor](https://pypi.org/project/termcolor/)
-- [impacket](https://pypi.org/project/impacket/)
-- [python-nmap](https://pypi.org/project/python-nmap/)
-- [ollama](https://pypi.org/project/ollama/)
+## 🧩 Module Breakdown
 
-Install the dependencies using pip:
+### 🛫 Preflight (pre-checks)
+- Validates the project directory and structure
+- Extracts and formats `scope.txt` into internal/external/web files
+- Performs quick port reachability checks
+- Tags valid IPs for further analysis
+
+### 🦅 Raven (Active Scanning)
+- Orchestrates live scans using `nmap`
+- Automatically grabs banners
+- Invokes loaded plugins per port
+- Stores all plugin output in `Scan-Data/<host>/`
+
+### 🐦 Magpie (Plugin Manager)
+- Manages registration and loading of static and AI-generated plugins
+- Supports autoloading from `modules/plugins`
+- Registers plugins using `.should_run()` matching logic
+
+### 🦉 Owl (AI Reporting & Summary)
+- Creates a rich markdown report (`report.md`)
+- Embeds host summaries, open ports, plugin results
+- Collapsible vulnerability insights using markdown `<details>`
+- Optionally opens the report automatically post-run
+
+---
+
+## 🪄 AI Plugin Generation
+
+Flock-It integrates with **Ollama** to auto-generate service-specific scan plugins:
+
+- Triggered when a new service/port combo is found
+- Creates plugin file like `ai-gen-http_80_scan.py`
+- Plugin class inherits `ScanPlugin`, uses `print_status`, and returns dictionaries
+- Output is automatically saved under `Scan-Data/<host>/`
+
+Plugins follow a structure like:
+```python
+from modules.plugins import ScanPlugin
+from utils.common import print_status
+
+class Http_80Scan(ScanPlugin):
+    name = "http_80"
+
+    def should_run(self, host, port, port_data):
+        return port == 80
+
+    def run(self, host, port, port_data):
+        print_status("Running HTTP scan...", "info")
+        return {"banner": port_data.get("banner", "N/A")}
+```
+
+---
+
+## 🔧 Usage
 
 ```bash
-pip install -r requirements.txt
+python3 flockit_dev_0.6.py --project PR00100 --ascii --auto
 ```
 
-## Installation
+Available flags:
+- `--project <name>`: Project folder name (required)
+- `--settings <file>`: Path to a custom settings XML file
+- `--ascii`: Show ASCII network map
+- `--output <file>`: Output report file (default: `report.md`)
+- `--mode <quick|full>`: Select scan depth mode (default: `quick`)
 
-1. Clone or download the repository and place the main script in your working directory.
+### 🧠 Automation Flags
+- `--auto`: Auto-accept all prompts (overrides others)
+- `--auto-upload`: Automatically upload the zipped project folder to SMB
+- `--auto-ai`: Automatically run AI vulnerability analysis after scan
+- `--auto-view-report`: Automatically open the final markdown report
+- `--auto-plugin`: Automatically generate AI-based plugins if not found
+- `--project <name>`: Project folder name (required)
+- `--auto`: Enable auto mode (preflight + scan + report)
+- `--int`, `--ext`, `--web`: Limit scan type manually
 
-2. Prepare Your Scope File
-    Place your `scope.txt` file in the same directory as the script. If one is not found, a sample will be created.
+---
 
-3. Run the Script
-    
-    Execute the script:
+## 📦 SMB Upload Support
 
-    ```bash
-    python pre-flight-check_0.6.py --auto --ascii
-    ```
+Flock-It can automatically zip the entire project directory and upload to an SMB share at the end of the run.
 
-The script will prompt you for a project number (press Enter to default to PR00000).
+Target path is:
+```
+smb://<IP>/Media/Projects/<project_name>/<project_name>.zip
+```
+You’ll be prompted to enter credentials.
 
+---
+
+## 📋 Requirements
+
+- Python 3.8+
+- nmap (CLI)
+- [Ollama](https://ollama.com/) (running locally)
+- Impacket (for SMB uploads)
+
+Install dependencies:
+```bash
+pip install -r requirementst.txt
+```
+
+---
+
+## 🤝 Contributions
+
+Pull requests welcome. All AI plugin templates are being refined — contributions to prompt engineering or service detection logic especially helpful.
+
+---
+
+## 🧪 In Progress
+- Report export to PDF/HTML
+- Plugin classification by scan type
+- Tag-based plugin enable/disable
+- Cross-host correlation insights
+- Passive recon integration
+
+---
+
+Happy flocking 🐦
