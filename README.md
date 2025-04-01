@@ -1,7 +1,18 @@
 # 🧰 Flock-It: Integrated Pentest Framework
 
+<img src="flockit.png" alt="Logo" width="200">
+
 Flock-It is an all-in-one pentest automation framework designed to streamline the recon, scanning, and reporting process for internal, external, and web application testing. It supports plugin-based extensibility and AI integration for enhanced remediation and vulnerability context.
 
+---
+
+## 🤔 Why Flockit?
+
+- Bird-Themed Modules: PreFlight checks, RavenRecon, and Owl reporting—each inspired by speed, intelligence, and vision.
+- From Boot to Report: Designed for real-world pentesters to get from scope file to upload in minutes.
+- Smart, Not Noisy: Flockit doesn't just scan—it organises, interprets, and documents.
+- Built for Teams: Project folder structure and plugin architecture make it easy to hand off or scale.
+- Modular as Flock: Swap in custom plugins, use XML/Markdown outputs, or integrate into your own workflow.
 ---
 
 ## 🚀 Features
@@ -117,6 +128,10 @@ Available flags:
 - `--int`, `--ext`, `--web`: Limit scan type manually
 
 ---
+
+## Demo
+
+![Demo](Demo.gif)
 
 ## 📦 SMB Upload Support
 
