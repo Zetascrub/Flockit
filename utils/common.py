@@ -259,3 +259,32 @@ def ollama_chat(system_prompt, user_prompt, model=None):
 def set_custom_settings(settings):
     global CUSTOM_SETTINGS
     CUSTOM_SETTINGS = settings
+
+
+def save_scan_output(host, filename, content, base_dir=None):
+    """
+    Saves output content to <base_dir>/Scan-Data/<host>/<filename>
+    """
+    if base_dir is None:
+        base_dir = os.getcwd()
+    elif os.path.isfile(base_dir):
+        base_dir = os.path.dirname(base_dir)
+    elif base_dir.endswith(".md"):
+        base_dir = os.path.dirname(base_dir)
+
+
+
+
+
+    full_path = os.path.join(base_dir, "Scan-Data", host)
+    os.makedirs(full_path, exist_ok=True)
+
+    file_path = os.path.join(full_path, filename)
+    try:
+        with open(file_path, "w") as f:
+            f.write(content)
+        print_status(f"[+] Saved scan output to {file_path}", "info")
+    except Exception as e:
+        print_status(f"[!] Failed to write {file_path}: {e}", "error")
+
+

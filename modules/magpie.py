@@ -110,55 +110,53 @@ class Magpie:
             plugin_body_raw = ollama_chat(system_prompt, user_prompt)
 
             if "```" not in plugin_body_raw and "class" not in plugin_body_raw:
-                print_status(f"[!] AI response did not return valid code. Skipping plugin generation for: {service}",
-                             "warning")
+                print_status(f"[!] AI response did not return valid code. Skipping plugin generation for: {service}", "warning")
                 return
 
             plugin_body = extract_python_code(plugin_body_raw)
 
-            # Fix common import errors
-            plugin_body = plugin_body.replace("from utils.common import ScanPlugin",
-                                              "from modules.plugins import ScanPlugin")
-            plugin_body = plugin_body.replace("from modules.utils import common", "from utils import common")
-            plugin_body = plugin_body.replace("from modules.utils.common import print_status",
-                                              "from utils.common import print_status")
-            plugin_body = plugin_body.replace("print_error", "print_status")
+            # Fix known bad imports
+            plugin_body = re.sub(r"from modules\.plugins import .*?print_status", "from modules.plugins import ScanPlugin", plugin_body)
+            plugin_body = re.sub(r"from utils\.common import .*?ScanPlugin", "from modules.plugins import ScanPlugin", plugin_body)
+            plugin_body = re.sub(r"from modules\.plugins import ScanPlugin,?", "from modules.plugins import ScanPlugin", plugin_body)
+            plugin_body = re.sub(r"from utils\.common import .*?ScanPlugin", "from modules.plugins import ScanPlugin", plugin_body)
+            plugin_body = re.sub(r"from .* import print_status", "from utils.common import print_status", plugin_body)
+
+            # Remove any 'def print_status' inside the plugin
+            plugin_body = re.sub(r"\n\s*def print_status\(.*?\n(?:\s+.*\n)+?", "\n", plugin_body)
+
+            # Replace self.print_status with global version
+            plugin_body = plugin_body.replace("self.print_status(", "print_status(")
 
             if validate_plugin_code(plugin_body):
                 break
             else:
-                print_status(
-                    f"[!] Attempt {attempt + 1}: Generated plugin for {service} failed validation. Retrying...",
-                    "warning")
+                print_status(f"[!] Attempt {attempt + 1}: Generated plugin for {service} failed validation. Retrying...", "warning")
         else:
             print_status(f"[!] Final attempt failed. Plugin for {service} not saved.", "warning")
             return
 
-        # Prepend fallback header in case LLM omits it
+        # Final header and write-out (after the loop)
         header = textwrap.dedent(f"""
             from modules.plugins import ScanPlugin
             from utils.common import print_status
             import socket
         """)
-
         full_code = header + "\n\n" + plugin_body
 
-        # Remove any duplicate imports
-        lines = full_code.splitlines()
-        seen = set()
-        cleaned_lines = []
-        for line in lines:
-            if line.strip().startswith("from ") or line.strip().startswith("import "):
-                if line in seen:
-                    continue
-                seen.add(line)
-            cleaned_lines.append(line)
-        full_code = "\n".join(cleaned_lines)
+        try:
+            compile(full_code, plugin_filename, 'exec')
+        except SyntaxError as e:
+            print_status(f"[!] Syntax error in generated plugin: {e}", "error")
+            return
 
-        with open(plugin_path, "w", encoding="utf-8") as f:
-            f.write(full_code.strip())
+        # Save plugin to disk
+        with open(plugin_path, "w") as f:
+            f.write(full_code)
 
         print_status(f"[+] Generated new AI plugin: {plugin_filename}", "success")
+
+
 
 
 def extract_python_code(ollama_response: str) -> str:
@@ -209,6 +207,12 @@ def validate_plugin_code(code: str) -> bool:
     if "return {" not in code and "return \"" not in code and "return '" not in code:
         print_status("[!] Plugin run() does not appear to return useful data (dictionary or string)", "warning")
         valid = False
+
+    # 6. Check for print_status use    
+    if "self.print_status" in code:
+        print_status("[!] Plugin incorrectly uses self.print_status", "warning")
+        valid = False
+
 
     return valid
 

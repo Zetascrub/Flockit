@@ -9,7 +9,7 @@ import importlib.util
 import inspect
 import requests
 
-from utils.common import print_status, lookup_vulnerabilities_for_port, check_ollama, ollama_chat, AUTO
+from utils.common import print_status, lookup_vulnerabilities_for_port, check_ollama, ollama_chat, AUTO, save_scan_output
 from modules.plugins import ScanPlugin
 from modules.magpie import Magpie
 
@@ -73,68 +73,58 @@ class Raven:
         except KeyboardInterrupt:
             print_status("[-] Scan interrupted by user. Shutting down.", "error")
 
-    def scan_host(self, host, arguments):
-        print_status(f"[+] Starting scan on {host} with arguments: {arguments}", "info")
-        try:
-            scanner = nmap.PortScanner()
-            scanner.scan(host, arguments=arguments)
+    def scan_host(self, host, context=None):
+        print_status(f"[~] Scanning network for open ports and services...", "scan")
+        host_info = {"ports": []}
 
-            if host not in scanner.all_hosts():
-                print_status(f"⚠️ Nmap returned no results for {host}. Skipping this host.", "warning")
-                return {}
+        scanner = nmap.PortScanner()
+        arguments = "-F"
+        scanner.scan(host, arguments=arguments)
 
-            host_info = {
-                "hostname": scanner[host].hostname(),
-                "state": scanner[host].state(),
-                "ports": []
-            }
+        # Save raw output
+        nmap_raw_output = scanner.csv()
+        save_scan_output(host, "nmap.csv", nmap_raw_output, base_dir=self.output)
 
-            for proto in scanner[host].all_protocols():
-                for port in scanner[host][proto].keys():
-                    print_status(f"[+] Scanning port {port} on {host}...", "info")
-                    port_info = scanner[host][proto][port]
-                    port_data = {
-                        "port": port,
-                        "state": port_info["state"],
-                        "service": port_info.get("name", "Unknown"),
-                        "version": port_info.get("version", "Unknown"),
-                        "raw_output": json.dumps(port_info, indent=2)[:500]
-                    }
+        for proto in scanner[host].all_protocols():
+            for port in scanner[host][proto].keys():
+                port_data = {
+                    "port": port,
+                    "state": scanner[host][proto][port]["state"],
+                    "service": scanner[host][proto][port].get("name", ""),
+                    "version": scanner[host][proto][port].get("version", "")
+                }
 
-                    self.grab_banner(host, port, port_data)
+                print_status(f"Scanning port {port} on {host}...", "scan")
 
+                # Grab banner and store
+                banner = self.grab_banner(host, port, port_data)
+                if banner:
+                    port_data["banner"] = banner
+                    save_scan_output(host, f"banner_{port}.txt", banner, base_dir=self.output)
 
-                    # Check for matching plugin first
-                    matching_plugins = [plugin for plugin in self.plugin_manager.get_plugins() if plugin.should_run(host, port, port_data)]
-
-                    if matching_plugins:
-                        for plugin in matching_plugins:
+                # Run plugins for this port
+                for plugin in self.plugin_manager.plugins:
+                    if plugin.should_run(host, port, port_data):
+                        try:
                             result = plugin.run(host, port, port_data)
                             port_data[plugin.name] = result
-                    else:
-                        if AUTO.get("plugin"):
-                            self.plugin_manager.generate_plugin_for(port_data)
-                            self.plugin_manager.load_plugins()
 
+                            # Save full plugin result as JSON
+                            if isinstance(result, dict):
+                                plugin_output_json = json.dumps(result, indent=2)
+                                save_scan_output(host, f"{plugin.name}_output.json", plugin_output_json, base_dir=self.output)
 
+                                # Save just the banner too, if present
+                                if "banner" in result:
+                                    save_scan_output(host, f"{plugin.name}_banner.txt", result["banner"], base_dir=self.output)
 
+                        except Exception as e:
+                            print_status(f"❌ Plugin {plugin.name} failed on {host}:{port} - {e}", "error")
+                            logging.exception(e)
 
+                host_info["ports"].append(port_data)
 
-                    port_data["vulnerabilities"] = lookup_vulnerabilities_for_port(port_data)
-                    host_info["ports"].append(port_data)
-
-            return host_info
-
-        except Exception as e:
-            import traceback
-            print_status(f"❌ Exception scanning {host}: {e}", "error")
-            traceback.print_exc()
-            return {}
-
-
-
-
-
+        return host_info
 
 
     def grab_banner(self, host, port, port_data):
@@ -144,9 +134,15 @@ class Raven:
                 s.sendall(b"\r\n")
                 banner = s.recv(1024).decode("utf-8", "ignore").strip().split("\n")[0]
                 if banner:
-                    port_data["banner"] = banner[:200]
+                    banner = banner[:200]
+                    port_data["banner"] = banner
+                    save_scan_output(host, f"banner_{port}.txt", banner, base_dir=self.output)
+                    return banner
         except Exception:
             pass
+        return None
+
+
 
     def analyse_vulnerabilities(self, host_info, hostname="unknown"):
         if not host_info or not isinstance(host_info, dict):

@@ -12,6 +12,10 @@ class Owl:
         self.targets = targets
         self.results = results
         self.output_path = output_path
+        self.project_dir = os.path.dirname(self.output_path)
+        self.report_path = self.output_path
+
+
 
     def generate_report(self):
         print_status("[+] Generating report...", "info")
@@ -21,15 +25,13 @@ class Owl:
 
         num_hosts = len(self.results)
         num_ports = sum(len(info.get("ports", [])) for info in self.results.values())
+
         def count_vulnerabilities(text):
             return text.count("### Vulnerability")
 
         num_vulns = sum(count_vulnerabilities(info.get("vulnerabilities_ai", "")) for info in self.results.values())
 
-        print_status(
-            f"[+] Scan Summary: Hosts: {num_hosts}, Ports: {num_ports}, Vulnerabilities (AI): {num_vulns}",
-            "info"
-        )
+        print_status(f"[+] Scan Summary: Hosts: {num_hosts}, Ports: {num_ports}, Vulnerabilities (AI): {num_vulns}", "info")
 
         report_md += "**Scan Summary:**\n"
         report_md += f"- Hosts Scanned: {num_hosts}\n"
@@ -37,6 +39,7 @@ class Owl:
         report_md += f"- Vulnerabilities Found (AI): {num_vulns}\n\n"
 
         report_md += "## Host Scan Results\n\n"
+
         for host, data in self.results.items():
             if not isinstance(data, dict):
                 print_status(f"[!] Skipping malformed result for host: {host}", "warning")
@@ -55,21 +58,31 @@ class Owl:
 
                 report_md += f"\n**Vulnerability Lookup Result:**\n```{port.get('vulnerabilities', 'No vulnerabilities found.')}\n```\n"
 
-                standard_keys = {"port", "state", "service", "version", "banner", "vulnerabilities", "ssl_scan",
-                                 "raw_output"}
+                standard_keys = {"port", "state", "service", "version", "banner", "vulnerabilities", "ssl_scan", "raw_output"}
                 for key, plugin_output in port.items():
                     if key not in standard_keys:
                         report_md += f"\n<details>\n<summary><strong>Plugin: {key}</strong></summary>\n\n"
-                        plugin_output_str = json.dumps(plugin_output, indent=2) if isinstance(plugin_output,
-                                                                                              dict) else str(
-                            plugin_output)
+                        plugin_output_str = json.dumps(plugin_output, indent=2) if isinstance(plugin_output, dict) else str(plugin_output)
                         report_md += f"```json\n{plugin_output_str}\n```\n</details>\n"
+
+            # 🔗 Artifact links section
+            report_md += f"\n### Host Artifacts\n\n"
+            report_md += f"- 📁 [Raw Nmap CSV Output](Scan-Data/{host}/nmap.csv)\n"
+
+            for port in data.get("ports", []):
+                banner_file = f"banner_{port['port']}.txt"
+                report_md += f"- 📄 [Banner {port['port']}]({os.path.join('Scan-Data', host, banner_file)})\n"
+
+                for key in port.keys():
+                    if key.endswith("_scan") or key.endswith("_output"):
+                        filename = f"{key}_output.txt"
+                        report_md += f"- 📄 [{key} Output]({os.path.join('Scan-Data', host, filename)})\n"
 
             ai_summary = data.get("vulnerabilities_ai", "No vulnerabilities identified.")
             report_md += "\n<details>\n<summary><strong>AI Vulnerability Analysis</strong></summary>\n\n"
             report_md += f"```markdown\n{ai_summary}\n```\n</details>\n\n"
 
-        # Append Executive Summary
+        # Executive summary at the end
         exec_summary = self.generate_executive_summary(self.results)
         report_md += "\n" + exec_summary + "\n"
 
@@ -78,7 +91,6 @@ class Owl:
 
         print_status(f"[+] Report saved to {self.output_path}", "success")
 
-        # View Report Prompt
         choice = prompt_yes_no("Do you want to see the report? (y/n): ", "view_report")
         if choice == 'y':
             print("\n" + "=" * 60 + "\nREPORT OUTPUT:\n" + "=" * 60)
@@ -89,14 +101,15 @@ class Owl:
             try:
                 if platform.system() == "Windows":
                     os.startfile(self.output_path)
-                elif platform.system() == "Darwin":  # macOS
+                elif platform.system() == "Darwin":
                     subprocess.run(["open", self.output_path])
-                else:  # Linux and others
+                else:
                     subprocess.run(["xdg-open", self.output_path])
             except Exception as e:
                 print_status(f"[!] Could not open file automatically: {e}", "warning")
                 print_status("Please open the file manually from your file explorer.", "info")
 
+    
     @staticmethod
     def generate_executive_summary(results):
         total_hosts = len(results)
@@ -128,6 +141,8 @@ class Owl:
         summary += "\nA detailed review of the full scan report is recommended to prioritize remediation efforts.\n"
 
         return summary
+
+
 
 
 if __name__ == "__main__":

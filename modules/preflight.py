@@ -332,7 +332,7 @@ class PreFlight:
         print_status("\n" + summary_str, "info")
         
         # Write summary to summary.txt in the project folder
-        summary_file = os.path.join(self.project_folder, "summary.txt")
+        summary_file = os.path.join(self.project_folder, "Pre-Flight-Summary.txt")
         try:
             with open(summary_file, "w") as f:
                 f.write(summary_str)
