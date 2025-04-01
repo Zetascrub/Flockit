@@ -43,7 +43,7 @@ def flock():
     AUTO["mode"] = args.auto
 
     # Load settings globally
-    settings_path = args.settings if args.settings else "settings_dev.xml"
+    settings_path = args.settings if args.settings else "settings.xml"
     settings = load_settings_xml(settings_path)
     set_custom_settings(settings)
 
