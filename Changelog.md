@@ -9,6 +9,39 @@ All notable changes to the **Flockit** will be documented in this file.
 - Severity tagging and markdown colourisation in AI output.
 - Potential project name change
 - Move checks to the start of the script (Ollama, Nmap, etc)
+<<<<<<< HEAD
+=======
+
+---
+
+## [0.6.3]
+
+### Added
+- Full **Passive Recon** support:
+  - WHOIS and DNS record collection (A, MX, NS, TXT) for external/web targets.
+  - Results are integrated into the report under each host as `"passive"`.
+- **AI Plugin Autogeneration**:
+  - If no plugin exists for a port/service, Flock-It generates one using Ollama or OpenAI.
+  - Generated plugins validated for required methods (`should_run`, `run`) and stored under `modules/plugins`.
+- New `--auto-plugin` flag and enhanced `--auto` logic now cover plugin gen, AI analysis, and upload.
+- XML Settings schema expanded to include:
+  - `<DefaultAIProvider>`, `<OpenAI>`, and additional SMB/server options.
+- `Magpie` plugin manager with validation, dynamic loading, and plugin coverage checks.
+- Auto-report viewer prompt with fallback to OS default viewer.
+
+### Improved
+- Final result filtering in `flockit.py` now ensures only complete and valid hosts remain.
+- Project flow now logically runs: pre-checks → reachability → scan → AI analysis → report → optional upload.
+- `Owl` report module now adds artifact links per port (e.g. banners, plugin outputs).
+- Executive summary at report end dynamically summarizes key exposures and suggestions.
+- Settings loading and application is now global and consistent across all modules.
+
+### Fixed
+- Prevented malformed or incomplete data from breaking the AI or report generation phases.
+- Improved plugin code sanitisation to remove duplicate or invalid import statements.
+- Plugin filename conflicts avoided by auto-slugging service/port combos.
+
+>>>>>>> f974e00 (0.6.3 release)
 ---
 ## [0.6.3]
 

@@ -3,3 +3,4 @@ termcolor
 impacket
 python-nmap
 ollama
+openai

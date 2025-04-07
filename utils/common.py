@@ -23,7 +23,11 @@ AUTO = {
     "view_report": False
 }
 
+<<<<<<< HEAD
 
+=======
+VERBOSITY = "info"  # possible values: "quiet", "info", "debug"
+>>>>>>> f974e00 (0.6.3 release)
 CUSTOM_SETTINGS = {}
 
 
@@ -118,34 +122,56 @@ def generate_ascii_visualisation(results):
 
 def print_status(msg, level="info"):
     symbols = {
-        "info":    ("[~]", "cyan"),
+        "debug": ("[DEBUG]", "magenta"),
+        "info":  ("[~]", "cyan"),
         "success": ("✅", "green"),
         "warning": ("⚠️", "yellow"),
-        "error":   ("❌", "red"),
-        "scan":    ("🔍", "blue"),
-        "upload":  ("📤", "magenta"),
-        "report":  ("📄", "white"),
+        "error": ("❌", "red")
     }
+    # Quiet mode: only warnings and errors.
+    if VERBOSITY == "quiet" and level not in ["warning", "error"]:
+        return
+    # Info mode: skip debug.
+    if VERBOSITY == "info" and level == "debug":
+        return
+
     symbol, color = symbols.get(level, ("[~]", "white"))
     cprint(f"{symbol} {msg}", color, attrs=["bold"])
     log_method = {
+<<<<<<< HEAD
+=======
+        "debug": logging.debug,
+>>>>>>> f974e00 (0.6.3 release)
         "info": logging.info,
         "success": logging.info,
         "warning": logging.warning,
         "error": logging.error,
+<<<<<<< HEAD
         "scan": logging.info,
         "upload": logging.info,
         "report": logging.info,
+=======
+>>>>>>> f974e00 (0.6.3 release)
     }.get(level, logging.info)
     log_method(msg)
 
 def print_banner(title):
+    # Skip banners in quiet mode.
+    if VERBOSITY == "quiet":
+        return
     cprint("\n" + "=" * 50, "blue", attrs=["bold"])
     cprint(f"{title.center(50)}", "blue", attrs=["bold"])
     cprint("=" * 50 + "\n", "blue", attrs=["bold"])
 
+<<<<<<< HEAD
 def load_settings_xml(filepath="settings_dev.xml"):
     print_status("Loading Custom Settings","info")
+=======
+
+
+def load_settings_xml(filepath="settings_dev.xml"):
+    print_status("Loading Custom Settings", "info")
+>>>>>>> f974e00 (0.6.3 release)
     default_settings = {
         "ports": [22, 80, 443, 445, 3389],
         "timeout": 0.5,
@@ -156,7 +182,14 @@ def load_settings_xml(filepath="settings_dev.xml"):
         "smb_username": "",
         "valid_external_ranges": [],
         "OllamaHost": "localhost",
+<<<<<<< HEAD
         "OllamaModel": "llama3.2"
+=======
+        "OllamaModel": "llama3.2",
+        "openai_api_key": "",
+        "openai_model": "gpt-4",
+        "ai_provider": "ollama"
+>>>>>>> f974e00 (0.6.3 release)
     }
     if not os.path.exists(filepath):
         print_status("settings.xml not found. Using default settings.", "warning")
@@ -164,15 +197,44 @@ def load_settings_xml(filepath="settings_dev.xml"):
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
+<<<<<<< HEAD
+=======
+
+        # Standard config
+>>>>>>> f974e00 (0.6.3 release)
         ports = root.findtext("Ports")
         timeout = root.findtext("Timeout")
         external_ip_url = root.findtext("ExternalIPURL")
         output_format = root.findtext("OutputFormat")
+<<<<<<< HEAD
+=======
+
+        # SMB config
+>>>>>>> f974e00 (0.6.3 release)
         smb = root.find("SMB")
         smb_server = smb.findtext("Server") if smb is not None else ""
         smb_share = smb.findtext("Share") if smb is not None else ""
         smb_username = smb.findtext("Username") if smb is not None else ""
+<<<<<<< HEAD
         valid_ranges = [r.text.strip() for r in root.findall(".//ValidExternalRanges/Range") if r.text]
+=======
+
+        # Valid IP Ranges
+        valid_ranges = [r.text.strip() for r in root.findall(".//ValidExternalRanges/Range") if r.text]
+
+        # Ollama
+        ollama_host = root.findtext("OllamaHost") or default_settings["OllamaHost"]
+        ollama_model = root.findtext("OllamaModel") or default_settings["OllamaModel"]
+
+        # OpenAI block
+        openai_block = root.find("OpenAI")
+        openai_api_key = openai_block.findtext("APIKey") if openai_block is not None else ""
+        openai_model = openai_block.findtext("Model") if openai_block is not None else "gpt-4"
+
+        # AI selection
+        ai_provider = root.findtext("DefaultAIProvider") or default_settings["ai_provider"]
+
+>>>>>>> f974e00 (0.6.3 release)
         settings = {
             "ports": [int(p.strip()) for p in ports.split(",")] if ports else default_settings["ports"],
             "timeout": float(timeout) if timeout else default_settings["timeout"],
@@ -181,10 +243,21 @@ def load_settings_xml(filepath="settings_dev.xml"):
             "smb_server": smb_server,
             "smb_share": smb_share,
             "smb_username": smb_username,
+<<<<<<< HEAD
             "valid_external_ranges": valid_ranges or default_settings["valid_external_ranges"],
             "OllamaHost": root.findtext("OllamaHost") or default_settings["OllamaHost"],
             "OllamaModel": root.findtext("OllamaModel") or default_settings["OllamaModel"]
         }
+=======
+            "valid_external_ranges": valid_ranges,
+            "OllamaHost": ollama_host,
+            "OllamaModel": ollama_model,
+            "openai_api_key": openai_api_key,
+            "openai_model": openai_model,
+            "ai_provider": ai_provider.lower()
+        }
+
+>>>>>>> f974e00 (0.6.3 release)
         return settings
     except Exception as e:
         print_status(f"Error loading settings.xml: {e}", "error")
@@ -288,3 +361,108 @@ def save_scan_output(host, filename, content, base_dir=None):
         print_status(f"[!] Failed to write {file_path}: {e}", "error")
 
 
+<<<<<<< HEAD
+=======
+CUSTOM_SETTINGS = load_settings_xml()
+
+def check_ollama():
+    host = CUSTOM_SETTINGS.get("ollama_host", "localhost:11434")
+
+    try:
+        response = requests.get(f"http://{host}/api/status", timeout=3)
+        if response.status_code == 200:
+            print_status("[+] Ollama service is running (/api/status check)", "info")
+            return True
+        else:
+            print_status(f"[~] /api/status returned {response.status_code}", "warning")
+    except requests.RequestException as e:
+        print_status(f"[!] /api/status unreachable: {e}", "warning")
+
+    try:
+        response = requests.get(f"http://{host}/api/version", timeout=3)
+        if response.status_code == 200:
+            print_status("[+] Ollama service is running (/api/version check)", "info")
+            return True
+        else:
+            print_status(f"[~] /api/version returned {response.status_code}", "warning")
+    except requests.RequestException as e:
+        print_status(f"[!] /api/version unreachable: {e}", "warning")
+
+    print_status("[-] Ollama does not appear to be running correctly.", "error")
+    return False
+
+
+def ollama_chat(system_prompt, user_prompt, model=None):
+    import json
+
+    host = CUSTOM_SETTINGS.get("ollama_host", "localhost:11434").replace("http://", "").replace("https://", "")
+    model = model or CUSTOM_SETTINGS.get("ollama_model", "llama3.2")
+    url = f"http://{host}/api/chat"
+
+    payload = {
+        "model": model,
+        "stream": True,  # Request streamed response
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+    }
+
+    try:
+        response = requests.post(url, json=payload, stream=True, timeout=30)
+
+        content_accumulator = []
+        for line in response.iter_lines(decode_unicode=True):
+            if not line.strip():
+                continue
+            try:
+                chunk = json.loads(line)
+                content_piece = chunk.get("message", {}).get("content", "")
+                if content_piece:
+                    content_accumulator.append(content_piece)
+            except json.JSONDecodeError as e:
+                print_status(f"[!] Stream chunk parse failed: {e}", "warning")
+
+        return "".join(content_accumulator).strip()
+
+    except requests.RequestException as e:
+        print_status(f"[!] Ollama streaming request failed: {e}", "error")
+        return "⚠️ Ollama Error: Failed to connect to Ollama. Please check that Ollama is downloaded, running and accessible."
+
+def set_custom_settings(settings):
+    global CUSTOM_SETTINGS
+    CUSTOM_SETTINGS = settings
+
+
+def save_scan_output(host, filename, content, base_dir=None):
+    """
+    Saves output content to <base_dir>/Scan-Data/<host>/<filename>
+    """
+    if base_dir is None:
+        base_dir = os.getcwd()
+    elif os.path.isfile(base_dir):
+        base_dir = os.path.dirname(base_dir)
+    elif base_dir.endswith(".md"):
+        base_dir = os.path.dirname(base_dir)
+
+
+
+
+
+    full_path = os.path.join(base_dir, "Scan-Data", host)
+    os.makedirs(full_path, exist_ok=True)
+
+    file_path = os.path.join(full_path, filename)
+    try:
+        with open(file_path, "w") as f:
+            f.write(content)
+        print_status(f"[+] Saved scan output to {file_path}", "info")
+    except Exception as e:
+        print_status(f"[!] Failed to write {file_path}: {e}", "error")
+
+
+def set_verbosity(level):
+    global VERBOSITY
+    VERBOSITY = level
+
+>>>>>>> f974e00 (0.6.3 release)

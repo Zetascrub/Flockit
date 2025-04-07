@@ -6,6 +6,27 @@ import inspect
 from utils.common import print_status, ollama_chat
 from modules.plugins import ScanPlugin
 import textwrap
+<<<<<<< HEAD
+=======
+from modules.kea import generate_plugin_code
+
+def extract_python_code(ollama_response: str) -> str:
+    code_blocks = re.findall(r"```(?:python)?\n(.*?)```", ollama_response, re.DOTALL)
+    return code_blocks[0].strip() if code_blocks else ollama_response.strip()
+
+def validate_plugin_code(code: str) -> bool:
+    valid = True
+    if "def should_run" not in code:
+        print_status("[!] Plugin missing required method: should_run()", "warning")
+        valid = False
+    if "def run" not in code:
+        print_status("[!] Plugin missing required method: run()", "warning")
+        valid = False
+    if "return" not in code:
+        print_status("[!] Plugin run() method missing return", "warning")
+        valid = False
+    return valid
+>>>>>>> f974e00 (0.6.3 release)
 
 class Magpie:
     def __init__(self, plugin_dir="modules/plugins"):
@@ -36,6 +57,7 @@ class Magpie:
                         plugin_instance = obj()
 
                         class_label = obj.__name__
+<<<<<<< HEAD
                         plugin_name = getattr(plugin_instance, "name", None)
 
                         if not plugin_name:
@@ -48,6 +70,12 @@ class Magpie:
 
                         print_status(
                             f"[+] Registered plugin: {plugin_name} (class: {class_label}, file: {file_label})",
+=======
+                        plugin_name = getattr(plugin_instance, "name", class_label)
+
+                        print_status(
+                            f"[+] Registered plugin: {plugin_name} (class: {class_label}, file: {filename})",
+>>>>>>> f974e00 (0.6.3 release)
                             "info"
                         )
                         self.plugins.append(plugin_instance)
@@ -64,20 +92,29 @@ class Magpie:
                 return True
         return False
 
+<<<<<<< HEAD
     def generate_plugin_for(self, port_data):
+=======
+    def generate_plugin_for(self, port_data, provider="ollama"):
+>>>>>>> f974e00 (0.6.3 release)
         port = port_data['port']
         service = port_data.get('service', 'unknown').replace("-", "_")
         version = port_data.get('version', '')
         banner = port_data.get('banner', '')
 
         plugin_slug = f"{service}_{port}".replace("-", "_").lower()
+<<<<<<< HEAD
         class_name = f"{plugin_slug.capitalize()}Scan"
+=======
+        class_name = "".join(word.capitalize() for word in plugin_slug.split("_")) + "Scan"
+>>>>>>> f974e00 (0.6.3 release)
         plugin_filename = f"ai-gen-{plugin_slug}_scan.py"
         plugin_path = os.path.join(self.plugin_dir, plugin_filename)
 
         if os.path.exists(plugin_path):
             print_status(f"[!] Plugin file {plugin_filename} already exists. Skipping generation.", "warning")
             return
+<<<<<<< HEAD
         print_status(f"Attempting to generate a new plugin for {service}:{port}", "info")
 
         system_prompt = (
@@ -127,10 +164,24 @@ class Magpie:
 
             # Replace self.print_status with global version
             plugin_body = plugin_body.replace("self.print_status(", "print_status(")
+=======
+
+        print_status(f"Attempting to generate a new plugin for {service}:{port} using {provider}", "info")
+
+        plugin_body = None
+        for attempt in range(3):
+            plugin_body_raw = generate_plugin_code(port_data, provider=provider)
+            if not plugin_body_raw or ("class" not in plugin_body_raw and "```" not in plugin_body_raw):
+                print_status(f"[!] Attempt {attempt + 1}: No usable plugin code returned.", "warning")
+                continue
+
+            plugin_body = extract_python_code(plugin_body_raw).strip()
+>>>>>>> f974e00 (0.6.3 release)
 
             if validate_plugin_code(plugin_body):
                 break
             else:
+<<<<<<< HEAD
                 print_status(f"[!] Attempt {attempt + 1}: Generated plugin for {service} failed validation. Retrying...", "warning")
         else:
             print_status(f"[!] Final attempt failed. Plugin for {service} not saved.", "warning")
@@ -143,6 +194,17 @@ class Magpie:
             import socket
         """)
         full_code = header + "\n\n" + plugin_body
+=======
+                print_status(f"[!] Attempt {attempt + 1}: Plugin failed validation.", "warning")
+                plugin_body = None
+
+        if not plugin_body:
+            print_status(f"[!] Final attempt failed. Plugin for {service} not saved.", "warning")
+            return
+
+        header = "from modules.plugins import ScanPlugin\nfrom utils.common import print_status\nimport socket\n\n"
+        full_code = header + plugin_body
+>>>>>>> f974e00 (0.6.3 release)
 
         try:
             compile(full_code, plugin_filename, 'exec')
@@ -150,6 +212,7 @@ class Magpie:
             print_status(f"[!] Syntax error in generated plugin: {e}", "error")
             return
 
+<<<<<<< HEAD
         # Save plugin to disk
         with open(plugin_path, "w") as f:
             f.write(full_code)
@@ -216,3 +279,10 @@ def validate_plugin_code(code: str) -> bool:
 
     return valid
 
+=======
+        with open(plugin_path, "w") as f:
+            print_status(f"[~] Generated plugin content:\n{full_code}", "debug")
+            f.write(full_code)
+
+        print_status(f"[+] Generated new AI plugin: {plugin_filename}", "success")
+>>>>>>> f974e00 (0.6.3 release)

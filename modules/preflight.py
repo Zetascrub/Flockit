@@ -109,7 +109,7 @@ class PreFlight:
         else:
             if os.path.exists(EXT_SCOPE_FILE):
                 os.remove(EXT_SCOPE_FILE)
-            print_status("No external IPs found; ext_scope.txt not created.", "warning")
+            print_status("No external IPs found; ext_scope.txt not created.", "info")
 
         if web_entries:
             with open(WEB_SCOPE_FILE, "w") as f:
@@ -119,7 +119,7 @@ class PreFlight:
         else:
             if os.path.exists(WEB_SCOPE_FILE):
                 os.remove(WEB_SCOPE_FILE)
-            print_status("No website URLs found; web_scope.txt not created.","warning")
+            print_status("No website URLs found; web_scope.txt not created.","info")
 
     def check_external_ip_validity(self):
         ext_ip = requests.get(CUSTOM_SETTINGS["external_ip_url"]).text.strip()
@@ -176,10 +176,12 @@ class PreFlight:
 
     def upload_to_smb(self, local_file, remote_path, domain=""):
         try:
-            smb_server = CUSTOM_SETTINGS.get("smb_server") or input("SMB Server: ")
-            smb_share = CUSTOM_SETTINGS.get("smb_share") or input("SMB Share: ")
-            smb_user = CUSTOM_SETTINGS.get("smb_username") or input("SMB Username: ")
-            smb_pass = getpass.getpass("Enter SMB password (leave blank for none): ")
+            auto_upload = AUTO.get("upload", False)
+            smb_server = CUSTOM_SETTINGS.get("smb_server") if CUSTOM_SETTINGS.get("smb_server") else ("" if auto_upload else input("SMB Server: "))
+            smb_share = CUSTOM_SETTINGS.get("smb_share") if CUSTOM_SETTINGS.get("smb_share") else ("" if auto_upload else input("SMB Share: "))
+            smb_user = CUSTOM_SETTINGS.get("smb_username") if CUSTOM_SETTINGS.get("smb_username") else ("" if auto_upload else input("SMB Username: "))
+            smb_pass = "" if auto_upload else getpass.getpass("Enter SMB password (leave blank for none): ")
+
             conn = SMBConnection(smb_server, smb_server)
             conn.login(smb_user, smb_pass, domain)
             logger = logging.getLogger()
@@ -353,7 +355,7 @@ class PreFlight:
             mode_results.append({"external_ip": ext_ip})
         scope_entries = self.check_scope_file(file_path)
         if not scope_entries:
-            print_status(f"[-] Skipping {mode.upper()} checks due to no entries.", "warning")
+            print_status(f"[-] Skipping {mode.upper()} checks due to no entries.", "info")
             return
         for entry in scope_entries:
             result = {}

@@ -9,7 +9,11 @@ import importlib.util
 import inspect
 import requests
 
+<<<<<<< HEAD
 from utils.common import print_status, lookup_vulnerabilities_for_port, check_ollama, ollama_chat, AUTO, save_scan_output, logging
+=======
+from utils.common import print_status, lookup_vulnerabilities_for_port, check_ollama, ollama_chat, AUTO, save_scan_output, logging, CUSTOM_SETTINGS
+>>>>>>> f974e00 (0.6.3 release)
 from modules.plugins import ScanPlugin
 from modules.magpie import Magpie
 
@@ -73,6 +77,7 @@ class Raven:
         except KeyboardInterrupt:
             print_status("[-] Scan interrupted by user. Shutting down.", "error")
 
+<<<<<<< HEAD
     def scan_host(self, host, context=None):
         print_status(f"[~] Scanning network for open ports and services...", "scan")
         host_info = {"ports": []}
@@ -97,18 +102,69 @@ class Raven:
                 print_status(f"Scanning port {port} on {host}...", "scan")
 
                 # Grab banner and store
+=======
+        # After active scanning, run passive recon for external/web targets.
+        # Ensure targets is a list (if self.targets is a string, split it).
+
+        if not isinstance(self.targets, list):
+            targets = self.targets.split()
+        else:
+            targets = self.targets
+
+        passive_results = self.run_passive_recon()  # Uses self.targets internally
+
+        for target, presult in passive_results.items():
+            # Merge passive recon results into the active scan results.
+            if target in self.results:
+                self.results[target]["passive"] = presult
+            else:
+                self.results[target] = {"passive": presult}
+
+    def scan_host(self, host, context=None):
+        print_status(f"[~] Scanning network for open ports and services...", "scan")
+        host_info = {"ports": []}
+        scanner = nmap.PortScanner()
+        arguments = "-F"
+        scanner.scan(host, arguments=arguments)
+        nmap_raw_output = scanner.csv()
+        save_scan_output(host, "nmap.csv", nmap_raw_output, base_dir=self.output)
+
+        for proto in scanner[host].all_protocols():
+            for port in scanner[host][proto].keys():
+                port_data = {
+                    "port": port,
+                    "state": scanner[host][proto][port]["state"],
+                    "service": scanner[host][proto][port].get("name", ""),
+                    "version": scanner[host][proto][port].get("version", "")
+                }
+
+                print_status(f"Scanning port {port} on {host}...", "scan")
+
+                # Grab banner
+>>>>>>> f974e00 (0.6.3 release)
                 banner = self.grab_banner(host, port, port_data)
                 if banner:
                     port_data["banner"] = banner
                     save_scan_output(host, f"banner_{port}.txt", banner, base_dir=self.output)
 
+<<<<<<< HEAD
                 # Run plugins for this port
+=======
+                # 🔥 Auto-generate plugin if missing
+                if not self.plugin_manager.is_port_covered(port_data):
+                    provider = CUSTOM_SETTINGS.get("ai_provider", "ollama")
+                    self.plugin_manager.generate_plugin_for(port_data, provider=provider)
+                    self.plugin_manager.load_plugins()
+
+                # Run all matching plugins
+>>>>>>> f974e00 (0.6.3 release)
                 for plugin in self.plugin_manager.plugins:
                     if plugin.should_run(host, port, port_data):
                         try:
                             result = plugin.run(host, port, port_data)
                             port_data[plugin.name] = result
 
+<<<<<<< HEAD
                             # Save full plugin result as JSON
                             if isinstance(result, dict):
                                 plugin_output_json = json.dumps(result, indent=2)
@@ -125,7 +181,24 @@ class Raven:
                 host_info["ports"].append(port_data)
 
         return host_info
+=======
+                            if isinstance(result, dict):
+                                plugin_output_json = json.dumps(result, indent=2)
+                                save_scan_output(host, f"{plugin.name}_output.json", plugin_output_json,
+                                                 base_dir=self.output)
 
+                                if "banner" in result:
+                                    save_scan_output(host, f"{plugin.name}_banner.txt", result["banner"],
+                                                     base_dir=self.output)
+
+                        except Exception as e:
+                            print_status(f"❌ Plugin {plugin.name} failed on {host}:{port} - {e}", "error")
+                            logging.exception(e)
+
+                host_info["ports"].append(port_data)
+>>>>>>> f974e00 (0.6.3 release)
+
+        return host_info
 
     def grab_banner(self, host, port, port_data):
         print_status(f"[+] Grabbing banner for {host}:{port}...", "info")
@@ -187,3 +260,36 @@ class Raven:
 
     def count_vulnerabilities(self, vulnerabilities_text):
         return len(re.findall(r'\*\*Vulnerability \d+:', vulnerabilities_text))
+
+    def is_domain(self, target):
+        # A simple check: if the target has letters, assume it's a domain.
+        return any(c.isalpha() for c in target)
+
+    def passive_recon(self, target):
+        import whois
+        import dns.resolver
+        results = {}
+        try:
+            results["whois"] = whois.whois(target)
+        except Exception as e:
+            results["whois"] = f"WHOIS lookup failed: {e}"
+        records = {}
+        for rtype in ["A", "MX", "NS", "TXT"]:
+            try:
+                answers = dns.resolver.resolve(target, rtype)
+                records[rtype] = [ans.to_text() for ans in answers]
+            except Exception as e:
+                records[rtype] = f"DNS lookup failed: {e}"
+        results["dns"] = records
+        return results
+
+    def run_passive_recon(self):
+        passive_results = {}
+        # Ensure targets is a list
+        targets = self.targets if isinstance(self.targets, list) else self.targets.split()
+        for target in targets:
+            if self.is_domain(target):
+                print_status(f"[~] Running passive recon on {target}...", "info")
+                passive_results[target] = self.passive_recon(target)
+        return passive_results
+
