@@ -3,15 +3,24 @@
     <Timeout>0.5</Timeout>
     <ExternalIPURL>https://api.ipify.org</ExternalIPURL>
     <OutputFormat>XML</OutputFormat>
+    <OllamaHost>localhost</OllamaHost>
+    <OllamaModel>llama3.2</OllamaModel>
 
     <SMB>
-        <Server>192.168</Server>
-        <Share>SHARE</Share>
-        <Username>USER</Username>
+        <Server>SERVER</Server>
+        <Share>Share</Share>
+        <Username>USERNAME</Username>
     </SMB>
 
     <ValidExternalRanges>
         <Range>82.147.10.192/28</Range>
         <Range>82.147.10.208/28</Range>
     </ValidExternalRanges>
+
+    <OpenAI>
+        <APIKey>APIKey</APIKey>
+        <Model>gpt-4</Model>
+    </OpenAI>
+
+    <DefaultAIProvider>ollama</DefaultAIProvider>
 </Settings>
