@@ -1,4 +1,4 @@
-# 🧰 Flock-It: Integrated Pentest Framework
+# 🧰 Flock-It: Integrated Pentest Framework Version: 0.6.4
 
 <img src="flockit.png" alt="Logo" width="200">
 
