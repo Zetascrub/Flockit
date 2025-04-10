@@ -1,5 +1,8 @@
 import json
 import re
+import shutil
+from openai import OpenAI
+import textwrap
 from utils.common import print_status, CUSTOM_SETTINGS
 import os
 
@@ -12,6 +15,82 @@ def sanitize_plugin_input(port_data):
         "version": port_data.get("version", ""),
         "banner": port_data.get("banner", "")
     }
+
+def format_ai_summary(summary, port_info=None, format_type="markdown"):
+    import textwrap
+    import re
+
+    if not summary or not isinstance(summary, str):
+        return "⚠️ No AI summary available."
+
+    port_label = f"{port_info.get('port')}/tcp ({port_info.get('service')})" if port_info else ""
+
+    summary = summary.strip().replace("\r", "")
+
+    # Strip markdown elements
+    summary = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 (\2)", summary)
+    summary = summary.replace("**", "").replace("`", "")
+    summary = re.sub(r"^```[a-z]*", "", summary, flags=re.MULTILINE)
+    summary = re.sub(r"^</?details.*?>", "", summary, flags=re.IGNORECASE)
+    summary = re.sub(r"</?summary.*?>", "", summary, flags=re.IGNORECASE)
+
+    width = 70  # For safe rendering in PDF with proportional fonts
+
+    if format_type == "markdown":
+        return f"""<details>
+    <summary><strong>AI Recommendations for {port_label}</strong></summary>
+
+    ```markdown
+    {summary}
+
+    </details>"""
+
+    elif format_type == "plain":
+        return f"AI Recommendations for {port_label}:\n\n{summary}"
+
+    elif format_type == "pdf":
+        width = 72
+        wrapped_lines = [f"AI Recommendations for {port_label}"]
+
+        for paragraph in summary.splitlines():
+            paragraph = paragraph.strip()
+            if not paragraph:
+                wrapped_lines.append("")
+                continue
+
+            # Strip markdown symbols
+            paragraph = re.sub(r"[*_`#]", "", paragraph)
+
+            # Shell command block hint
+            if paragraph.lower() in ("bash", "sh", "shell", "powershell"):
+                continue  # Drop this line
+            elif paragraph.startswith("sudo ") or paragraph.startswith("nmap "):
+                wrapped = textwrap.wrap(paragraph, width=width, break_long_words=False)
+                wrapped_lines.extend(wrapped)
+            elif re.match(r"^\d+\.", paragraph) or re.match(r"^[+*-] ", paragraph):
+                # Numbered or bulleted list
+                wrapped = textwrap.wrap(paragraph, width=width, break_long_words=False, subsequent_indent="   ")
+                wrapped_lines.extend(wrapped)
+            elif paragraph.upper() == paragraph and len(paragraph.split()) < 6:
+                # Treat short all-caps lines as headings
+                wrapped_lines.append("")
+                wrapped_lines.append(paragraph.upper())
+                wrapped_lines.append("")
+            else:
+                # Normal text
+                wrapped = textwrap.wrap(paragraph, width=width, break_long_words=False)
+                wrapped_lines.extend(wrapped)
+
+        return "\n".join(wrapped_lines)
+
+    return summary
+
+
+
+
+
+
+
 
 def generate_plugin_code(port_data, provider="ollama"):
     safe_data = sanitize_plugin_input(port_data)
@@ -73,9 +152,7 @@ def _use_ollama(system_prompt, user_prompt):
     return ollama_chat(system_prompt, user_prompt)
 
 def _use_openai(system_prompt, user_prompt):
-    from openai import OpenAI
-    
-    
+        
     api_key = CUSTOM_SETTINGS.get("openai_api_key")
     client = OpenAI(api_key=api_key)
     if not api_key:

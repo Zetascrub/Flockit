@@ -9,11 +9,7 @@ import importlib.util
 import inspect
 import requests
 
-<<<<<<< HEAD
 from utils.common import print_status, lookup_vulnerabilities_for_port, check_ollama, ollama_chat, AUTO, save_scan_output, logging
-=======
-from utils.common import print_status, lookup_vulnerabilities_for_port, check_ollama, ollama_chat, AUTO, save_scan_output, logging, CUSTOM_SETTINGS
->>>>>>> f974e00 (0.6.3 release)
 from modules.plugins import ScanPlugin
 from modules.magpie import Magpie
 
@@ -77,7 +73,6 @@ class Raven:
         except KeyboardInterrupt:
             print_status("[-] Scan interrupted by user. Shutting down.", "error")
 
-<<<<<<< HEAD
     def scan_host(self, host, context=None):
         print_status(f"[~] Scanning network for open ports and services...", "scan")
         host_info = {"ports": []}
@@ -102,69 +97,18 @@ class Raven:
                 print_status(f"Scanning port {port} on {host}...", "scan")
 
                 # Grab banner and store
-=======
-        # After active scanning, run passive recon for external/web targets.
-        # Ensure targets is a list (if self.targets is a string, split it).
-
-        if not isinstance(self.targets, list):
-            targets = self.targets.split()
-        else:
-            targets = self.targets
-
-        passive_results = self.run_passive_recon()  # Uses self.targets internally
-
-        for target, presult in passive_results.items():
-            # Merge passive recon results into the active scan results.
-            if target in self.results:
-                self.results[target]["passive"] = presult
-            else:
-                self.results[target] = {"passive": presult}
-
-    def scan_host(self, host, context=None):
-        print_status(f"[~] Scanning network for open ports and services...", "scan")
-        host_info = {"ports": []}
-        scanner = nmap.PortScanner()
-        arguments = "-F"
-        scanner.scan(host, arguments=arguments)
-        nmap_raw_output = scanner.csv()
-        save_scan_output(host, "nmap.csv", nmap_raw_output, base_dir=self.output)
-
-        for proto in scanner[host].all_protocols():
-            for port in scanner[host][proto].keys():
-                port_data = {
-                    "port": port,
-                    "state": scanner[host][proto][port]["state"],
-                    "service": scanner[host][proto][port].get("name", ""),
-                    "version": scanner[host][proto][port].get("version", "")
-                }
-
-                print_status(f"Scanning port {port} on {host}...", "scan")
-
-                # Grab banner
->>>>>>> f974e00 (0.6.3 release)
                 banner = self.grab_banner(host, port, port_data)
                 if banner:
                     port_data["banner"] = banner
                     save_scan_output(host, f"banner_{port}.txt", banner, base_dir=self.output)
 
-<<<<<<< HEAD
                 # Run plugins for this port
-=======
-                # 🔥 Auto-generate plugin if missing
-                if not self.plugin_manager.is_port_covered(port_data):
-                    provider = CUSTOM_SETTINGS.get("ai_provider", "ollama")
-                    self.plugin_manager.generate_plugin_for(port_data, provider=provider)
-                    self.plugin_manager.load_plugins()
-
-                # Run all matching plugins
->>>>>>> f974e00 (0.6.3 release)
                 for plugin in self.plugin_manager.plugins:
                     if plugin.should_run(host, port, port_data):
                         try:
                             result = plugin.run(host, port, port_data)
                             port_data[plugin.name] = result
 
-<<<<<<< HEAD
                             # Save full plugin result as JSON
                             if isinstance(result, dict):
                                 plugin_output_json = json.dumps(result, indent=2)
@@ -181,22 +125,6 @@ class Raven:
                 host_info["ports"].append(port_data)
 
         return host_info
-=======
-                            if isinstance(result, dict):
-                                plugin_output_json = json.dumps(result, indent=2)
-                                save_scan_output(host, f"{plugin.name}_output.json", plugin_output_json,
-                                                 base_dir=self.output)
-
-                                if "banner" in result:
-                                    save_scan_output(host, f"{plugin.name}_banner.txt", result["banner"],
-                                                     base_dir=self.output)
-
-                        except Exception as e:
-                            print_status(f"❌ Plugin {plugin.name} failed on {host}:{port} - {e}", "error")
-                            logging.exception(e)
-
-                host_info["ports"].append(port_data)
->>>>>>> f974e00 (0.6.3 release)
 
         return host_info
 
@@ -221,42 +149,33 @@ class Raven:
         if not host_info or not isinstance(host_info, dict):
             return "⚠️ Invalid host data — skipping AI analysis."
 
-        ports = []
-        for p in host_info.get("ports", []):
-            if isinstance(p, dict) and p.get("port") and p.get("service"):
-                ports.append({
-                    "port": p["port"],
-                    "state": p.get("state", "unknown"),
-                    "service": p["service"],
-                    "version": p.get("version", "unknown"),
-                    "banner": p.get("banner", "N/A")
-                })
+        for port_data in host_info.get("ports", []):
+            if not isinstance(port_data, dict) or not port_data.get("port"):
+                continue
 
-        data = {
-            "hostname": hostname,
-            "ports": ports
-        }
+            port = port_data["port"]
+            service = port_data.get("service", "unknown")
+            version = port_data.get("version", "unknown")
+            banner = port_data.get("banner", "N/A")
 
-        # Ensure ports are populated
-        if not data["ports"]:
-            return "⚠️ No ports found for this host — skipping AI analysis."
+            prompt = f"""Scan Results:
+    - Port: {port}
+    - Service: {service}
+    - Version: {version}
+    - Banner: {banner}
 
-        system_prompt = (
-            "You are a cybersecurity expert. Analyse the scan results and identify potential "
-            "vulnerabilities. Provide a markdown-formatted summary of risks and remediation suggestions."
-        )
+    Please provide a short markdown-formatted summary of any potential risks and specific security recommendations for this service."""
 
-        user_prompt = f"Scan Data:\n{json.dumps(data, indent=2)}"
-        if DEBUG_AI_PROMPT:
-            print(f"[~] Prompt sent to Ollama for {hostname}:")
-            print(json.dumps(data, indent=2))
+            system_prompt = (
+                "You are a cybersecurity analyst. Given port scan results, identify risks and give concise, technical recommendations. "
+                "Respond in markdown format. Do not include unnecessary fluff."
+            )
 
-        response = ollama_chat(system_prompt, user_prompt)
+            ai_summary = ollama_chat(system_prompt, prompt)
+            port_data["ai_recommendation"] = ai_summary.strip() if ai_summary else "No AI feedback available."
 
-        if not response.strip() or "error" in response.lower():
-            return "⚠️ AI analysis failed or returned an error."
+        return "✅ Per-port AI summaries attached."
 
-        return response.strip()[:8000]
 
     def count_vulnerabilities(self, vulnerabilities_text):
         return len(re.findall(r'\*\*Vulnerability \d+:', vulnerabilities_text))

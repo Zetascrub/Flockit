@@ -9,11 +9,40 @@ import sys
 import atexit
 import argparse
 
-version = "0.6.3"
+version = "0.6.4"
 
 # Global variables for custom settings and scan results
 SCAN_RESULTS = {}  # Dictionary to store scan results per mode
 PROJECT_FOLDER = ""  # Set in main()
+
+def validate_environment():
+    print_banner("🔍 Environment Validation")
+
+    # Ollama check
+    if CUSTOM_SETTINGS.get("default_ai_provider") == "ollama":
+        if not check_ollama():
+            print_status("❌ Ollama is not running or reachable. Please start the Ollama server.", "error")
+            sys.exit(1)
+
+    # OpenAI API Key check
+    if CUSTOM_SETTINGS.get("default_ai_provider") == "openai":
+        api_key = CUSTOM_SETTINGS.get("openai_api_key", "")
+        if not api_key or "your-api-key" in api_key:
+            print_status("❌ OpenAI API key is missing or invalid in settings.xml.", "error")
+            sys.exit(1)
+
+    # VPN / External IP range check
+    external_ip = requests.get(CUSTOM_SETTINGS["external_ip_url"]).text.strip()
+    valid_ranges = CUSTOM_SETTINGS.get("valid_external_ranges", [])
+    ip_obj = ipaddress.ip_address(external_ip)
+
+    if not any(ip_obj in ipaddress.ip_network(net) for net in valid_ranges):
+        print_status(f"⚠️ External IP {external_ip} is not within valid ranges.", "warning")
+        if not prompt_yes_no("Continue anyway?", AUTO["mode"]):
+            sys.exit("Aborting due to invalid VPN connection.")
+
+    print_status("✅ Environment looks good.", "success")
+
 
 def flock():
     print_banner("Flock-It: Integrated Pentest Framework")
@@ -24,11 +53,10 @@ def flock():
     parser.add_argument("--ascii", action="store_true", help="Display ASCII network map at the end")
     parser.add_argument("--output", default="report.md", help="Output report file")
     parser.add_argument("--mode", choices=["quick", "full"], default="quick", help="Scan mode")
-<<<<<<< HEAD
-=======
     parser.add_argument("--verbose", action="store_true", help="Increase output verbosity")
     parser.add_argument("--quiet", action="store_true", help="Decrease output verbosity")
->>>>>>> f974e00 (0.6.3 release)
+    parser.add_argument("--pdf", action="store_true", help="Export PDF version of report")
+
 
     # Auto flags
     parser.add_argument("--auto", action="store_true", help="Auto-accept all prompts (overrides others)")
@@ -39,18 +67,6 @@ def flock():
 
     args = parser.parse_args()
 
-<<<<<<< HEAD
-    # Configure automation options
-    AUTO["general"] = args.auto
-    AUTO["upload"] = args.auto or args.auto_upload
-    AUTO["ai_analysis"] = args.auto or args.auto_ai
-    AUTO["view_report"] = args.auto or args.auto_view_report
-    AUTO["plugin"] = args.auto or args.auto_plugin
-    AUTO["mode"] = args.auto
-
-    # Load settings globally
-    settings_path = args.settings if args.settings else "settings.xml"
-=======
     if args.quiet:
         set_verbosity("quiet")
     elif args.verbose:
@@ -65,12 +81,16 @@ def flock():
     AUTO["view_report"] = args.auto or args.auto_view_report
     AUTO["plugin"] = args.auto or args.auto_plugin
     AUTO["mode"] = args.auto
+    CUSTOM_SETTINGS["auto_mode"] = AUTO["mode"]
+
 
     # Load settings globally
     settings_path = args.settings if args.settings else "settings_dev.xml"
->>>>>>> f974e00 (0.6.3 release)
     settings = load_settings_xml(settings_path)
     set_custom_settings(settings)
+
+    # 🔍 Pre-check everything before continuing
+    validate_environment()
 
     # Step 1: Project setup
     project_number = args.project or input("Enter Project Number (default PR00000): ").strip() or "PR00000"
@@ -85,10 +105,7 @@ def flock():
 
     pre.print_summary()
     pre.write_xml_output()
-<<<<<<< HEAD
-=======
     print_banner("Preflight Phase Completed")
->>>>>>> f974e00 (0.6.3 release)
 
     # Step 3: Active Recon and Scanning
     recon_targets = pre.get_recon_targets()
@@ -104,10 +121,7 @@ def flock():
         return
 
     raven.scan_network(live_hosts)
-<<<<<<< HEAD
-=======
     print_banner("Active Scanning Phase Completed")
->>>>>>> f974e00 (0.6.3 release)
 
     # Step 4: Final filter on malformed results
     raven.results = {
@@ -123,11 +137,8 @@ def flock():
                 print_status(f"Skipping malformed host data for: {host}", "warning")
                 continue
 
-            summary = raven.analyse_vulnerabilities(info, hostname=host)
-            if isinstance(summary, str) and summary.strip().startswith("##"):
-                info["vulnerabilities_ai"] = summary.strip()
-            else:
-                info["vulnerabilities_ai"] = "⚠️ AI analysis failed or returned no summary."
+            raven.analyse_vulnerabilities(info, hostname=host)
+
 
     # Final filter to ensure only actual hosts remain in results
     raven.results = {
@@ -135,19 +146,20 @@ def flock():
         if isinstance(info, dict) and isinstance(host, str) and "ports" in info and isinstance(info["ports"], list)
     }
 
-<<<<<<< HEAD
-=======
     print_banner("Vulnerability Analysis Phase Completed")
 
->>>>>>> f974e00 (0.6.3 release)
     # Step 6: Reporting
     print_banner("Reporting")
-    owl = Owl(raven.targets, raven.results, os.path.join(pre.project_folder, args.output))
+    report_path = os.path.join(pre.project_folder, args.output)
+    #owl = Owl(raven.targets, raven.results, os.path.join(pre.project_folder, args.output))
+    owl = Owl(raven.targets, raven.results, report_path, pdf_mode=args.pdf)
+
     print(owl.generate_report())
-<<<<<<< HEAD
-=======
+    if args.pdf:
+        md_path = os.path.join(pre.project_folder, args.output)
+        convert_markdown_to_pdf(md_path)
+
     print_banner("Reporting Phase Completed")
->>>>>>> f974e00 (0.6.3 release)
 
     # Optional ASCII network map
     if args.ascii:
@@ -155,13 +167,15 @@ def flock():
         print_status(generate_ascii_visualisation(raven.results), "info")
 
     # Step 7: Optional SMB Upload
-    if pre.prompt_smb_upload():
-        pre.compress_and_upload()
-<<<<<<< HEAD
+    if not CUSTOM_SETTINGS.get("auto_mode"):
+        print_banner("SMB Upload")
+
+    pre.compress_and_upload()
+
+    if CUSTOM_SETTINGS.get("auto_mode"):
+        print_status("Auto mode complete. All steps finished.", "success")
 
 
-=======
->>>>>>> f974e00 (0.6.3 release)
 
     print("Done")
 if __name__ == "__main__":

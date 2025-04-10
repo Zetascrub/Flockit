@@ -1,19 +1,33 @@
 import re
 import os
+import textwrap
 import json
 from datetime import datetime
 from utils.common import print_status, prompt_yes_no
 from utils.common import AUTO
+from modules.kea import format_ai_summary
 
 
 # --- Generates markdown reports & summary ---
 class Owl:
-    def __init__(self, targets, results, output_path):
+    def __init__(self, targets, results, output_path, pdf_mode=False):
         self.targets = targets
         self.results = results
         self.output_path = output_path
-        self.project_dir = os.path.dirname(self.output_path)
-        self.report_path = self.output_path
+        self.project_dir = os.path.dirname(output_path)
+        self.report_path = output_path
+        self.pdf_mode = pdf_mode
+
+
+
+    def clean_ai_output(self, text):
+        # Strip <details> and <summary> HTML tags
+        text = re.sub(r"</?details>|</?summary.*?>", "", text, flags=re.IGNORECASE)
+
+        # Remove extra backticks
+        text = re.sub(r"```(markdown)?", "", text)
+
+        return text.strip()
 
 
 
@@ -58,8 +72,21 @@ class Owl:
 
                 report_md += f"\n**Vulnerability Lookup Result:**\n```{port.get('vulnerabilities', 'No vulnerabilities found.')}\n```\n"
 
+                # Inline AI Recommendation Block
+                if "ai_recommendation" in port:
+                    format_type = "pdf" if self.pdf_mode else "markdown"
+                    report_md += "\n" + format_ai_summary(
+                        port["ai_recommendation"],
+                        port_info={"port": port["port"], "service": port.get("service", "unknown")},
+                        format_type=format_type
+                    ) + "\n"
+
+
+
                 standard_keys = {"port", "state", "service", "version", "banner", "vulnerabilities", "ssl_scan", "raw_output"}
                 for key, plugin_output in port.items():
+                    if key == "ai_recommendation":
+                        continue
                     if key not in standard_keys:
                         report_md += f"\n<details>\n<summary><strong>Plugin: {key}</strong></summary>\n\n"
                         plugin_output_str = json.dumps(plugin_output, indent=2) if isinstance(plugin_output, dict) else str(plugin_output)
@@ -70,14 +97,8 @@ class Owl:
             report_md += f"- 📁 [Raw Nmap CSV Output](Scan-Data/{host}/nmap.csv)\n"
 
             for port in data.get("ports", []):
-<<<<<<< HEAD
                 banner_file = f"banner_{port['port']}.txt"
                 report_md += f"- 📄 [Banner {port['port']}]({os.path.join('Scan-Data', host, banner_file)})\n"
-=======
-                if "banner" in port and port["banner"]:
-                    banner_file = f"banner_{port['port']}.txt"
-                    report_md += f"- 📄 [Banner {port['port']}]({os.path.join('Scan-Data', host, banner_file)})\n"
->>>>>>> f974e00 (0.6.3 release)
 
                 for key in port.keys():
                     if key.endswith("_scan") or key.endswith("_output"):
@@ -99,13 +120,8 @@ class Owl:
 
         choice = prompt_yes_no("Do you want to see the report? (y/n): ", "view_report")
         if choice == 'y':
-<<<<<<< HEAD
             print("\n" + "=" * 60 + "\nREPORT OUTPUT:\n" + "=" * 60)
             print(report_md)
-=======
-            print_status("\n" + "=" * 60 + "\nREPORT OUTPUT:\n" + "=" * 60, "info")
-            print_status(report_md, "info")
->>>>>>> f974e00 (0.6.3 release)
         else:
             import subprocess
             import platform

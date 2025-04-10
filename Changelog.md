@@ -7,42 +7,31 @@ All notable changes to the **Flockit** will be documented in this file.
 ### Planned / To-Do
 - Passive Recon: WHOIS and DNS record lookups with parser integration.
 - Severity tagging and markdown colourisation in AI output.
-- Potential project name change
-- Move checks to the start of the script (Ollama, Nmap, etc)
-<<<<<<< HEAD
-=======
 
 ---
 
-## [0.6.3]
+## [0.6.4] - 2025-04-10
 
 ### Added
-- Full **Passive Recon** support:
-  - WHOIS and DNS record collection (A, MX, NS, TXT) for external/web targets.
-  - Results are integrated into the report under each host as `"passive"`.
-- **AI Plugin Autogeneration**:
-  - If no plugin exists for a port/service, Flock-It generates one using Ollama or OpenAI.
-  - Generated plugins validated for required methods (`should_run`, `run`) and stored under `modules/plugins`.
-- New `--auto-plugin` flag and enhanced `--auto` logic now cover plugin gen, AI analysis, and upload.
-- XML Settings schema expanded to include:
-  - `<DefaultAIProvider>`, `<OpenAI>`, and additional SMB/server options.
-- `Magpie` plugin manager with validation, dynamic loading, and plugin coverage checks.
-- Auto-report viewer prompt with fallback to OS default viewer.
+
+- AI vulnerability summaries are now formatted using format_ai_summary() with PDF-safe wrapping.
+- PDF generation now uses hard wrapping (72 chars) with no mid-word breaks.
+- Final confirmation message "Auto mode complete. All steps finished." now shown when using --auto.
+- Large project folders now compress correctly using zipfile.ZipFile(..., allowZip64=True).
+- CUSTOM_SETTINGS["auto_mode"] is now set when --auto is passed.
 
 ### Improved
-- Final result filtering in `flockit.py` now ensures only complete and valid hosts remain.
-- Project flow now logically runs: pre-checks → reachability → scan → AI analysis → report → optional upload.
-- `Owl` report module now adds artifact links per port (e.g. banners, plugin outputs).
-- Executive summary at report end dynamically summarizes key exposures and suggestions.
-- Settings loading and application is now global and consistent across all modules.
+
+- Raw plugin_outputs["ai_recommendation"] blocks are no longer duplicated in the report.
+- Markdown backticks, headings, and shell hints are removed or normalized in AI sections.
+- SMB upload banner is now suppressed when in auto mode.
 
 ### Fixed
-- Prevented malformed or incomplete data from breaking the AI or report generation phases.
-- Improved plugin code sanitisation to remove duplicate or invalid import statements.
-- Plugin filename conflicts avoided by auto-slugging service/port combos.
 
->>>>>>> f974e00 (0.6.3 release)
----
+- Prevented silent hangs on --auto caused by waiting for SMB input.
+- Cleaned up overspill and mid-word wrapping in PDF output.
+- Ensured PDF-safe rendering of long command-line strings and recommendation headers.
+
 ## [0.6.3]
 
 ### Added

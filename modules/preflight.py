@@ -156,9 +156,16 @@ class PreFlight:
 
     def prompt_smb_upload(self):
         print_banner("SMB Upload")
-        return prompt_yes_no("Do you want to upload the project folder to an SMB share? (y/n): ", "upload")
+        response = prompt_yes_no("Do you want to upload the project folder to an SMB share? (y/n): ", "upload")
+        return response == 'y'
+
 
     def compress_and_upload(self):
+
+        if CUSTOM_SETTINGS.get("auto_mode"):
+            print_status("Skipping SMB upload in auto mode.", "info")
+            return
+
         zip_filename = os.path.join(self.project_folder, os.path.basename(self.project_folder) + ".zip")
         self.compress_project_folder(zip_filename)
         print_status(f"Zip file created: {zip_filename}", "success")
