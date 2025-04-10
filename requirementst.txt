@@ -4,3 +4,5 @@ impacket
 python-nmap
 ollama
 openai
+markdown2
+weasyprint
