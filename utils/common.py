@@ -9,6 +9,8 @@ import requests
 import ollama
 from termcolor import cprint
 
+VERBOSITY = ""
+
 if os.name == "nt":
     import msvcrt
 else:

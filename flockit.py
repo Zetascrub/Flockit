@@ -3,7 +3,6 @@ from modules.preflight import PreFlight
 from modules.raven import Raven
 from modules.owl import Owl
 from utils.common import *
-
 import os
 import sys
 import atexit

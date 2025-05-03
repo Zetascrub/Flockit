@@ -12,3 +12,4 @@ settings_dev.xml
 Plugin_Dev/*
 .idea/*
 modules/plugins/ai-gen*
+.venv/
