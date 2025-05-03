@@ -70,14 +70,8 @@ class Owl:
             report_md += f"- 📁 [Raw Nmap CSV Output](Scan-Data/{host}/nmap.csv)\n"
 
             for port in data.get("ports", []):
-<<<<<<< HEAD
                 banner_file = f"banner_{port['port']}.txt"
                 report_md += f"- 📄 [Banner {port['port']}]({os.path.join('Scan-Data', host, banner_file)})\n"
-=======
-                if "banner" in port and port["banner"]:
-                    banner_file = f"banner_{port['port']}.txt"
-                    report_md += f"- 📄 [Banner {port['port']}]({os.path.join('Scan-Data', host, banner_file)})\n"
->>>>>>> f974e00 (0.6.3 release)
 
                 for key in port.keys():
                     if key.endswith("_scan") or key.endswith("_output"):
@@ -99,13 +93,8 @@ class Owl:
 
         choice = prompt_yes_no("Do you want to see the report? (y/n): ", "view_report")
         if choice == 'y':
-<<<<<<< HEAD
             print("\n" + "=" * 60 + "\nREPORT OUTPUT:\n" + "=" * 60)
             print(report_md)
-=======
-            print_status("\n" + "=" * 60 + "\nREPORT OUTPUT:\n" + "=" * 60, "info")
-            print_status(report_md, "info")
->>>>>>> f974e00 (0.6.3 release)
         else:
             import subprocess
             import platform

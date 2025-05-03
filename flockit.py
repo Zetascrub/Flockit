@@ -24,11 +24,6 @@ def flock():
     parser.add_argument("--ascii", action="store_true", help="Display ASCII network map at the end")
     parser.add_argument("--output", default="report.md", help="Output report file")
     parser.add_argument("--mode", choices=["quick", "full"], default="quick", help="Scan mode")
-<<<<<<< HEAD
-=======
-    parser.add_argument("--verbose", action="store_true", help="Increase output verbosity")
-    parser.add_argument("--quiet", action="store_true", help="Decrease output verbosity")
->>>>>>> f974e00 (0.6.3 release)
 
     # Auto flags
     parser.add_argument("--auto", action="store_true", help="Auto-accept all prompts (overrides others)")
@@ -39,7 +34,6 @@ def flock():
 
     args = parser.parse_args()
 
-<<<<<<< HEAD
     # Configure automation options
     AUTO["general"] = args.auto
     AUTO["upload"] = args.auto or args.auto_upload
@@ -50,25 +44,6 @@ def flock():
 
     # Load settings globally
     settings_path = args.settings if args.settings else "settings.xml"
-=======
-    if args.quiet:
-        set_verbosity("quiet")
-    elif args.verbose:
-        set_verbosity("debug")
-    else:
-        set_verbosity("info")
-
-    # Configure automation options
-    AUTO["general"] = args.auto
-    AUTO["upload"] = args.auto or args.auto_upload
-    AUTO["ai_analysis"] = args.auto or args.auto_ai
-    AUTO["view_report"] = args.auto or args.auto_view_report
-    AUTO["plugin"] = args.auto or args.auto_plugin
-    AUTO["mode"] = args.auto
-
-    # Load settings globally
-    settings_path = args.settings if args.settings else "settings_dev.xml"
->>>>>>> f974e00 (0.6.3 release)
     settings = load_settings_xml(settings_path)
     set_custom_settings(settings)
 
@@ -85,10 +60,6 @@ def flock():
 
     pre.print_summary()
     pre.write_xml_output()
-<<<<<<< HEAD
-=======
-    print_banner("Preflight Phase Completed")
->>>>>>> f974e00 (0.6.3 release)
 
     # Step 3: Active Recon and Scanning
     recon_targets = pre.get_recon_targets()
@@ -104,10 +75,6 @@ def flock():
         return
 
     raven.scan_network(live_hosts)
-<<<<<<< HEAD
-=======
-    print_banner("Active Scanning Phase Completed")
->>>>>>> f974e00 (0.6.3 release)
 
     # Step 4: Final filter on malformed results
     raven.results = {
@@ -135,19 +102,10 @@ def flock():
         if isinstance(info, dict) and isinstance(host, str) and "ports" in info and isinstance(info["ports"], list)
     }
 
-<<<<<<< HEAD
-=======
-    print_banner("Vulnerability Analysis Phase Completed")
-
->>>>>>> f974e00 (0.6.3 release)
     # Step 6: Reporting
     print_banner("Reporting")
     owl = Owl(raven.targets, raven.results, os.path.join(pre.project_folder, args.output))
     print(owl.generate_report())
-<<<<<<< HEAD
-=======
-    print_banner("Reporting Phase Completed")
->>>>>>> f974e00 (0.6.3 release)
 
     # Optional ASCII network map
     if args.ascii:
@@ -157,11 +115,8 @@ def flock():
     # Step 7: Optional SMB Upload
     if pre.prompt_smb_upload():
         pre.compress_and_upload()
-<<<<<<< HEAD
 
 
-=======
->>>>>>> f974e00 (0.6.3 release)
 
     print("Done")
 if __name__ == "__main__":
