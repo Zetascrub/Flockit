@@ -8,6 +8,7 @@ import requests
 import xml.dom.minidom as md
 from datetime import datetime
 import xml.etree.ElementTree as ET
+import concurrent.futures
 
 from utils.common import *
 from utils.common import CUSTOM_SETTINGS
@@ -241,16 +242,19 @@ class PreFlight:
         Returns a list of open ports."""
         print_status(f"[*] Scanning common ports on {ip}...", "info")
         open_ports = []
-        for port in CUSTOM_SETTINGS["ports"]:
+
+        def scan_port(port):
             try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(CUSTOM_SETTINGS["timeout"])
-                result = sock.connect_ex((ip, port))
-                if result == 0:
-                    open_ports.append(port)
-                sock.close()
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(CUSTOM_SETTINGS["timeout"])
+                    if sock.connect_ex((ip, port)) == 0:
+                        open_ports.append(port)
             except socket.error:
-                continue
+                pass
+
+        max_workers = min(len(CUSTOM_SETTINGS["ports"]), 10)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            executor.map(scan_port, CUSTOM_SETTINGS["ports"])
         if open_ports:
             print_status(f"[+] Open ports on {ip}: {open_ports}", "info")
         else:

@@ -145,6 +145,3 @@ class Owl:
 
 
 
-if __name__ == "__main__":
-    from utils.common import ollama_chat
-    ollama_chat("You respond with simple, short responses.","Can you be reached?","llama3.2")

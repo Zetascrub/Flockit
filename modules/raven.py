@@ -126,8 +126,6 @@ class Raven:
 
         return host_info
 
-        return host_info
-
     def grab_banner(self, host, port, port_data):
         print_status(f"[+] Grabbing banner for {host}:{port}...", "info")
         try:

@@ -153,7 +153,7 @@ def print_banner(title):
     cprint(f"{title.center(50)}", "blue", attrs=["bold"])
     cprint("=" * 50 + "\n", "blue", attrs=["bold"])
 
-def load_settings_xml(filepath="settings_dev.xml"):
+def load_settings_xml(filepath="settings.xml"):
     print_status("Loading Custom Settings","info")
     default_settings = {
         "ports": [22, 80, 443, 445, 3389],
@@ -164,8 +164,8 @@ def load_settings_xml(filepath="settings_dev.xml"):
         "smb_share": "",
         "smb_username": "",
         "valid_external_ranges": [],
-        "OllamaHost": "localhost",
-        "OllamaModel": "llama3.2"
+        "ollama_host": "localhost",
+        "ollama_model": "llama3.2"
     }
     if not os.path.exists(filepath):
         print_status("settings.xml not found. Using default settings.", "warning")
@@ -191,8 +191,8 @@ def load_settings_xml(filepath="settings_dev.xml"):
             "smb_share": smb_share,
             "smb_username": smb_username,
             "valid_external_ranges": valid_ranges or default_settings["valid_external_ranges"],
-            "OllamaHost": root.findtext("OllamaHost") or default_settings["OllamaHost"],
-            "OllamaModel": root.findtext("OllamaModel") or default_settings["OllamaModel"]
+            "ollama_host": root.findtext("OllamaHost") or default_settings["ollama_host"],
+            "ollama_model": root.findtext("OllamaModel") or default_settings["ollama_model"]
         }
         return settings
     except Exception as e:

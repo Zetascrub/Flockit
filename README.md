@@ -154,7 +154,7 @@ You’ll be prompted to enter credentials.
 
 Install dependencies:
 ```bash
-pip install -r requirementst.txt
+pip install -r requirements.txt
 ```
 
 ---
