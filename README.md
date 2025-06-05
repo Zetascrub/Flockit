@@ -19,6 +19,7 @@ Flock-It is an all-in-one pentest automation framework designed to streamline th
 
 - 🧪 Internal, external, and web recon support
 - 🔌 Plugin-based architecture
+- Includes built-in plugins for HTTP, FTP, SSH and SMB
 - 🪄 Auto-generates custom plugins using LLM (Ollama)
 - 🧠 AI-enhanced reporting and remediation context
 - 📦 Auto SMB uploads to shared drives
@@ -68,6 +69,12 @@ PR00099/
 - Manages registration and loading of static and AI-generated plugins
 - Supports autoloading from `modules/plugins`
 - Registers plugins using `.should_run()` matching logic
+### 📦 Built-in Plugins
+- `http_scan` - grabs HTTP banner
+- `ftp_scan` - captures FTP welcome message
+- `ssh_scan` - collects SSH server banner
+- `smb_scan` - lists SMB shares anonymously
+
 
 ### 🦉 Owl (AI Reporting & Summary)
 - Creates a rich markdown report (`report.md`)

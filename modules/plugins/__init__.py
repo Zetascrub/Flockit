@@ -1,13 +1,17 @@
 class ScanPlugin:
-    """
-    Base class for scan plugins.
-    Each plugin should define a unique name, a condition (should_run) and execution logic (run).
-    """
+    """Base class for all scanning plugins."""
+
+    # Short unique plugin name
     name = "base_plugin"
+    # Optional semantic version
     version = 1
+    # Human readable description
+    description = ""
 
     def should_run(self, host, port, port_data):
+        """Return True if plugin should execute for this port."""
         return False
 
     def run(self, host, port, port_data):
-        return None
+        """Execute plugin logic and return a result dictionary."""
+        return {}
