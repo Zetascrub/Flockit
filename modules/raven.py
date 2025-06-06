@@ -1,16 +1,16 @@
-import os
 import re
 import sys
 import json
 import socket
 import nmap
-import ollama
-import importlib.util
-import inspect
-import requests
 
-from utils.common import print_status, lookup_vulnerabilities_for_port, check_ollama, ollama_chat, AUTO, save_scan_output, logging
-from modules.plugins import ScanPlugin
+from utils.common import (
+    print_status,
+    check_ollama,
+    ollama_chat,
+    save_scan_output,
+    logging,
+)
 from modules.magpie import Magpie
 
 DEBUG_AI_PROMPT = False
@@ -23,6 +23,7 @@ class Raven:
         self.output = output
         self.mode = mode
         self.results = {}
+        # Initialise plugin manager which loads available plugins
         self.plugin_manager = Magpie()
 
         # try:
@@ -34,7 +35,6 @@ class Raven:
             print_status("[-] Ollama service is not responding. Please ensure it's running.", "error")
             sys.exit(1)
         # self.load_external_plugins()
-        self.plugin_manager.load_plugins()
 
 
     def discover_hosts(self):
