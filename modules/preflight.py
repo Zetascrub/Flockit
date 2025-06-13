@@ -276,11 +276,17 @@ class PreFlight:
         Write the accumulated SCAN_RESULTS into an XML file in the project folder.
         The XML structure includes mode sections and for each target, its details.
         """
-        root = ET.Element("ScanResults")
-        timestamp = ET.SubElement(root, "Timestamp")
-        timestamp.text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        xml_file = os.path.join(self.project_folder, "scan_results.xml")
+        if os.path.exists(xml_file):
+            tree = ET.parse(xml_file)
+            root = tree.getroot()
+        else:
+            root = ET.Element("ScanResults")
+
+        run_elem = ET.SubElement(root, "Run", timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
         for mode, results in SCAN_RESULTS.items():
-            mode_elem = ET.SubElement(root, "Mode", name=mode)
+            mode_elem = ET.SubElement(run_elem, "Mode", name=mode)
             for entry in results:
                 if "external_ip" in entry:
                     ext_elem = ET.SubElement(mode_elem, "ExternalIP")
