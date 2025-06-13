@@ -4,3 +4,4 @@ impacket
 python-nmap
 ollama
 openai
+flask

@@ -297,3 +297,18 @@ def save_scan_output(host, filename, content, base_dir=None):
         print_status(f"[!] Failed to write {file_path}: {e}", "error")
 
 
+
+
+
+def send_results_to_server(zip_path, server_url):
+    """Upload zipped results to a remote server via HTTP POST"""
+    try:
+        with open(zip_path, "rb") as f:
+            files = {"file": (os.path.basename(zip_path), f)}
+            resp = requests.post(server_url, files=files, timeout=10)
+        if resp.status_code == 200:
+            print_status(f"[+] Results uploaded to {server_url}", "success")
+        else:
+            print_status(f"[!] Server responded with {resp.status_code}", "warning")
+    except Exception as e:
+        print_status(f"[!] Failed to upload results: {e}", "error")

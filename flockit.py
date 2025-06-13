@@ -7,22 +7,23 @@ import os
 import sys
 import atexit
 import argparse
+import time
 
-version = "0.6.3"
+version = "0.6.4"
 
 # Global variables for custom settings and scan results
 SCAN_RESULTS = {}  # Dictionary to store scan results per mode
 PROJECT_FOLDER = ""  # Set in main()
 
 def flock():
-    print_banner("Flock-It: Integrated Pentest Framework")
-
     parser = argparse.ArgumentParser(description="Flock-It: Modular Penetration Testing Pre-Flight Framework")
     parser.add_argument("--settings", help="Path to an XML file for custom settings")
     parser.add_argument("--project", help="Project number")
     parser.add_argument("--ascii", action="store_true", help="Display ASCII network map at the end")
     parser.add_argument("--output", default="report.md", help="Output report file")
     parser.add_argument("--mode", choices=["quick", "full"], default="quick", help="Scan mode")
+    parser.add_argument("--loop-interval", type=int, default=0, help="Interval in minutes to repeat scanning")
+    parser.add_argument("--server-url", help="URL to POST zipped results to after each run")
 
     # Auto flags
     parser.add_argument("--auto", action="store_true", help="Auto-accept all prompts (overrides others)")
@@ -46,77 +47,93 @@ def flock():
     settings = load_settings_xml(settings_path)
     set_custom_settings(settings)
 
-    # Step 1: Project setup
-    project_number = args.project or input("Enter Project Number (default PR00000): ").strip() or "PR00000"
-    pre = PreFlight(project_number)
-    pre.setup()
+    def run_cycle():
+        print_banner("Flock-It: Integrated Pentest Framework")
 
-    # Step 2: Reachability Checks
-    print_banner("Preflight Reachability Checks")
-    for mode, filename in [("int", "int_scope.txt"), ("ext", "ext_scope.txt"), ("web", "web_scope.txt")]:
-        scope_path = os.path.join(pre.project_folder, filename)
-        pre.run_checks(mode, scope_path)
+        # Step 1: Project setup
+        project_number = args.project or input("Enter Project Number (default PR00000): ").strip() or "PR00000"
+        pre = PreFlight(project_number)
+        pre.setup()
 
-    pre.print_summary()
-    pre.write_xml_output()
+        # Step 2: Reachability Checks
+        print_banner("Preflight Reachability Checks")
+        for mode, filename in [("int", "int_scope.txt"), ("ext", "ext_scope.txt"), ("web", "web_scope.txt")]:
+            scope_path = os.path.join(pre.project_folder, filename)
+            pre.run_checks(mode, scope_path)
+
+        pre.print_summary()
+        pre.write_xml_output()
 
     # Step 3: Active Recon and Scanning
-    recon_targets = pre.get_recon_targets()
-    if not recon_targets or not pre.prompt_recon():
-        print_status("Recon skipped.", "warning")
-        return
+        recon_targets = pre.get_recon_targets()
+        if not recon_targets or not pre.prompt_recon():
+            print_status("Recon skipped.", "warning")
+            return pre
 
-    report_path = os.path.join(pre.project_folder, args.output)
-    raven = Raven(recon_targets, report_path, args.mode)
-    live_hosts = raven.discover_hosts()
-    if not live_hosts:
-        print_status("No live hosts found. Skipping active scanning.", "warning")
-        return
+        report_path = os.path.join(pre.project_folder, args.output)
+        raven = Raven(recon_targets, report_path, args.mode)
+        live_hosts = raven.discover_hosts()
+        if not live_hosts:
+            print_status("No live hosts found. Skipping active scanning.", "warning")
+            return pre
 
-    raven.scan_network(live_hosts)
+        raven.scan_network(live_hosts)
 
     # Step 4: Final filter on malformed results
-    raven.results = {
-        h: d for h, d in raven.results.items()
-        if isinstance(d, dict) and "ports" in d
-    }
+        raven.results = {
+            h: d for h, d in raven.results.items()
+            if isinstance(d, dict) and "ports" in d
+        }
 
     # Step 5: AI Vulnerability Analysis
-    if raven.results and pre.prompt_ai():
-        for host, info in raven.results.items():
-            print_status(f"Analyzing {host} with AI...", "info")
-            if not isinstance(info, dict):
-                print_status(f"Skipping malformed host data for: {host}", "warning")
-                continue
+        if raven.results and pre.prompt_ai():
+            for host, info in raven.results.items():
+                print_status(f"Analyzing {host} with AI...", "info")
+                if not isinstance(info, dict):
+                    print_status(f"Skipping malformed host data for: {host}", "warning")
+                    continue
 
-            summary = raven.analyse_vulnerabilities(info, hostname=host)
-            if isinstance(summary, str) and summary.strip().startswith("##"):
-                info["vulnerabilities_ai"] = summary.strip()
-            else:
-                info["vulnerabilities_ai"] = "⚠️ AI analysis failed or returned no summary."
+                summary = raven.analyse_vulnerabilities(info, hostname=host)
+                if isinstance(summary, str) and summary.strip().startswith("##"):
+                    info["vulnerabilities_ai"] = summary.strip()
+                else:
+                    info["vulnerabilities_ai"] = "⚠️ AI analysis failed or returned no summary."
 
     # Final filter to ensure only actual hosts remain in results
-    raven.results = {
-        host: info for host, info in raven.results.items()
-        if isinstance(info, dict) and isinstance(host, str) and "ports" in info and isinstance(info["ports"], list)
-    }
+        raven.results = {
+            host: info for host, info in raven.results.items()
+            if isinstance(info, dict) and isinstance(host, str) and "ports" in info and isinstance(info["ports"], list)
+        }
 
     # Step 6: Reporting
-    print_banner("Reporting")
-    owl = Owl(raven.targets, raven.results, os.path.join(pre.project_folder, args.output))
-    print(owl.generate_report())
+        print_banner("Reporting")
+        owl = Owl(raven.targets, raven.results, os.path.join(pre.project_folder, args.output))
+        print(owl.generate_report())
 
     # Optional ASCII network map
-    if args.ascii:
-        print_banner("ASCII Network Map")
-        print_status(generate_ascii_visualisation(raven.results), "info")
+        if args.ascii:
+            print_banner("ASCII Network Map")
+            print_status(generate_ascii_visualisation(raven.results), "info")
 
     # Step 7: Optional SMB Upload
-    if pre.prompt_smb_upload():
-        pre.compress_and_upload()
+        if pre.prompt_smb_upload():
+            pre.compress_and_upload()
 
 
 
-    print("Done")
+        print("Done")
+        return pre
+
+    while True:
+        pre = run_cycle()
+        if args.server_url:
+            zip_file = os.path.join(pre.project_folder, os.path.basename(pre.project_folder) + ".zip")
+            pre.compress_project_folder(zip_file)
+            send_results_to_server(zip_file, args.server_url)
+
+        if args.loop_interval <= 0:
+            break
+        print_status(f"Waiting {args.loop_interval} minutes before next scan...", "info")
+        time.sleep(args.loop_interval * 60)
 if __name__ == "__main__":
     flock()

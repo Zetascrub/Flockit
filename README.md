@@ -123,6 +123,8 @@ Available flags:
 - `--ascii`: Show ASCII network map
 - `--output <file>`: Output report file (default: `report.md`)
 - `--mode <quick|full>`: Select scan depth mode (default: `quick`)
+- `--loop-interval <minutes>`: Run scans continuously with the given interval
+- `--server-url <url>`: POST zipped results to this URL after each run
 
 ### 🧠 Automation Flags
 - `--auto`: Auto-accept all prompts (overrides others)
@@ -149,6 +151,16 @@ Target path is:
 smb://<IP>/Media/Projects/<project_name>/<project_name>.zip
 ```
 You’ll be prompted to enter credentials.
+
+## 🌐 Result Collector Server
+
+A basic Flask server (`results_server.py`) is included to receive zipped scan results. Run it on a system with network access:
+
+```bash
+python3 results_server.py
+```
+
+Configure Flock-It with `--server-url http://<server>:8000/upload` to send results after each loop.
 
 ---
 
