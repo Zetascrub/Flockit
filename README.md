@@ -114,7 +114,7 @@ class Http_80Scan(ScanPlugin):
 ## 🔧 Usage
 
 ```bash
-python3 flockit_dev_0.6.py --project PR00100 --ascii --auto
+python3 flockit.py --project PR00100 --ascii --auto
 ```
 
 Available flags:
