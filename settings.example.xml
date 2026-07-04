@@ -1,0 +1,49 @@
+<Settings>
+    <!-- Preflight reachability check settings -->
+    <Ports>22,80,443,445,3389</Ports>
+    <Timeout>0.5</Timeout>
+
+    <ExternalIPURL>https://api.ipify.org</ExternalIPURL>
+    <OutputFormat>XML</OutputFormat>
+
+    <!-- AI provider used for per-port analysis, plugin generation, and finding narration -->
+    <DefaultAIProvider>ollama</DefaultAIProvider>
+    <OllamaHost>localhost</OllamaHost>
+    <OllamaModel>llama3.2</OllamaModel>
+    <OpenAI>
+        <APIKey>YOUR_OPENAI_API_KEY</APIKey>
+        <Model>gpt-4</Model>
+    </OpenAI>
+
+    <!-- CVE matching (NVD CVE API 2.0) -->
+    <CVE>
+        <Source>nvd</Source>            <!-- nvd | off -->
+        <NVDApiKey></NVDApiKey>          <!-- optional, raises rate limit from 5/30s to 50/30s -->
+        <CacheTTLDays>30</CacheTTLDays>
+    </CVE>
+
+    <!-- Adaptive scan escalation tuning -->
+    <AdaptiveScan>
+        <EscalationThreshold>2</EscalationThreshold>
+        <PeerEscalationThreshold>1</PeerEscalationThreshold>
+        <MaxEscalatedHosts>25</MaxEscalatedHosts>
+        <HighValuePorts>21,23,110,135,139,445,1433,1521,3306,3389,5900,6379,9200,11211,27017</HighValuePorts>
+        <NotableVersionPatterns>
+            <Pattern>vsftpd 2\.3\.4</Pattern>
+            <Pattern>OpenSSH [1-5]\.</Pattern>
+            <Pattern>Apache/1\.</Pattern>
+            <Pattern>IIS/6\.0</Pattern>
+            <Pattern>Samba 3\.</Pattern>
+        </NotableVersionPatterns>
+    </AdaptiveScan>
+
+    <SMB>
+        <Server>SERVER</Server>
+        <Share>Share</Share>
+        <Username>USERNAME</Username>
+    </SMB>
+
+    <ValidExternalRanges>
+        <Range>203.0.113.0/28</Range>
+    </ValidExternalRanges>
+</Settings>

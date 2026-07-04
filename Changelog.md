@@ -1,12 +1,41 @@
 # Changelog
 
-All notable changes to the **Flockit** will be documented in this file.
+All notable changes to **Sift** (formerly **Flock-It**, renamed 2026-07-03) will be documented in this file. Entries before the rename refer to the tool by its former name.
 
 ---
 
 ### Planned / To-Do
 - Passive Recon: WHOIS and DNS record lookups with parser integration.
-- Severity tagging and markdown colourisation in AI output.
+- Wire `--auto-plugin` into the active scan loop so uncovered ports trigger candidate generation automatically (generation entry point exists, quarantined by default, but isn't yet auto-triggered mid-scan).
+- Active web/HTTP probing phase for `web_scope.txt` targets.
+
+---
+
+## [0.7.0] - 2026-07-03 (Unreleased)
+
+### Renamed
+- Project renamed from **Flock-It** to **Sift** — `flockit.py` is now `sift.py`, `flockit.png` is now `sift.png`.
+- Internal modules renamed from bird-themed to purpose-descriptive names: `raven.py`→`scanner.py` (`Raven`→`Scanner`), `owl.py`→`reporter.py` (`Owl`→`Reporter`), `magpie.py`→`plugin_manager.py` (`Magpie`→`PluginManager`), `kea.py`→`ai_prompts.py`, `kestrel.py`→`cve_lookup.py`, `harrier.py`→`correlation.py`. `preflight.py`, `adaptive.py`, and `plugin_validator.py` were already descriptive and are unchanged.
+
+### Added
+- **Adaptive scanning**: `--scan-mode adaptive` (new default) quick-scans every host, then escalates specific hosts to a deeper nmap pass based on high-value ports, notable version signatures, plugin opt-in, and peer-subnet influence (`modules/adaptive.py`).
+- **CVE-backed vulnerability matching**: deterministic service/version-to-CVE matching against the NVD CVE API 2.0, preferring nmap's own CPE data for precision, with a local per-project sqlite cache (`modules/cve_lookup.py`). Replaces the previously dead/unwired `cve.circl.lu` lookup code.
+- **Cross-host correlation**: a new "Top Findings" report section ranks repeated CVEs, shared vulnerable versions, and service overexposure across the whole engagement (`modules/correlation.py`), fully deterministic with optional AI narration on top of the top N findings.
+- **Safer AI plugin generation**: generated plugins are now written to `modules/plugins_quarantine/` and statically validated (`modules/plugin_validator.py`, AST-based) — never auto-loaded. New `sift.py plugins list|show|approve|reject` subcommands manage the review workflow. The 5 pre-existing AI-generated plugins were retroactively quarantined pending review.
+- Provider-neutral `AIClient` (`utils/ai_client.py`) used consistently for per-port analysis, plugin generation, and finding narration — `default_ai_provider=openai` now actually takes effect everywhere, not just plugin generation.
+- `settings.example.xml` documenting the full settings schema, including new `<CVE>`/`<AdaptiveScan>` blocks.
+- `--cve-source`, `--nvd-api-key`, `--top-findings` CLI flags.
+
+### Changed
+- **Architecture**: replaced the mutable module-level globals (`AUTO`, `CUSTOM_SETTINGS`, `SCAN_RESULTS`) with explicit `Config`/`ProjectContext` objects threaded through every phase, and loosely-shaped result dicts with a typed schema (`utils/models.py`: `PortResult`, `HostResult`, `ScanRun`, `Finding`). Scan/plugin file writes now go through `ArtifactStore` (`utils/artifacts.py`) instead of manual path-joining.
+- `--mode` renamed to `--scan-mode {quick,full,adaptive}` (default changed from `quick` to `adaptive`).
+- The preflight TCP-connect check is now explicitly advisory — nmap's active scan is always authoritative on port state; the report calls out the two only when they disagree.
+- Report structure: Top Findings now leads the report, followed by a factual scan summary, then per-host detail (including a CVE Matches table per port). The old naive `generate_executive_summary` (service-count-only, no real risk signal) was removed.
+
+### Fixed
+- `prompt_recon`/the "continue anyway" prompt no longer pass a bool where a dict key was expected (only harmless before by accident).
+- Removed a dead report code path that guessed artifact filenames from port dict keys, producing broken links.
+- `setup_logging` is now actually invoked, so each project folder gets a `sift.log`; fixed a file-handle leak on repeated calls.
 
 ---
 

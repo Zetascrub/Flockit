@@ -2,15 +2,18 @@ import os
 import re
 import json
 import ipaddress
+import importlib.util
+import shutil
 from collections import defaultdict
 import xml.etree.ElementTree as ET
 import logging
 import requests
-import ollama
 
-import markdown
-from weasyprint import HTML
-from termcolor import cprint
+try:
+    from termcolor import cprint
+except ImportError:
+    def cprint(text, color=None, attrs=None):
+        print(text)
 
 if os.name == "nt":
     import msvcrt
@@ -25,21 +28,8 @@ logging.getLogger().setLevel(logging.WARNING)
 logging.root.setLevel(logging.WARNING)
 
 
-# --- Main Function ---
-AUTO = {
-    "general": False,
-    "upload": False,
-    "ai_analysis": False,
-    "view_report": False
-}
-
-CUSTOM_SETTINGS = {}
-
 VERBOSITY = "info"  # Default can be 'debug', 'info', or 'quiet'
 
-
-# def restore_terminal_settings(fd, original_term_settings):
-#     termios.tcsetattr(fd, termios.TCSADRAIN, original_term_settings)
 
 def expand_ip_range(entry):
     match = re.match(r"^(\d{1,3}\.\d{1,3}\.\d{1,3}\.)\d{1,3}-\d{1,3}$", entry)
@@ -53,12 +43,10 @@ def expand_ip_range(entry):
 def is_domain(entry):
     return bool(re.match(r"^(?!http://|https://)[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", entry))
 
-def prompt_yes_no(prompt, auto_key=None):
-    if auto_key is None:
-        auto_mode = AUTO["general"]
-    else:
-        auto_mode = AUTO.get(auto_key, AUTO["general"])
-    return 'y' if auto_mode else input(prompt).strip().lower()
+def prompt_yes_no(prompt, auto=False):
+    if auto:
+        return True
+    return input(prompt).strip().lower() in ("y", "yes")
 
 def create_project_structure(proj_number):
     base_folder = proj_number or "PR00000"
@@ -84,25 +72,13 @@ def setup_logging(log_file):
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    logger.handlers.clear()
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+        handler.close()
     file_handler = logging.FileHandler(log_file, mode='a')
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
     return logger
-
-def lookup_vulnerabilities_for_port(port_data):
-    service, version = port_data.get("service"), port_data.get("version")
-    if not service or not version:
-        return "No service/version info available for vulnerability lookup."
-    try:
-        response = requests.get(f"https://cve.circl.lu/api/search/{service}", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            vulns = [entry for entry in data if version in json.dumps(entry)]
-            return "\n".join(f"- {v.get('id', 'Unknown')}: {v.get('summary', 'No summary')}" for v in vulns) or "No vulnerabilities found."
-        return "Vulnerability lookup API returned an error."
-    except Exception as e:
-        return f"Error during vulnerability lookup: {e}"
 
 def generate_ascii_visualisation(results):
     subnet_groups = defaultdict(list)
@@ -165,6 +141,12 @@ def print_banner(title):
 
 def load_settings_xml(filepath="settings_dev.xml"):
     print_status("Loading Custom Settings","info")
+    def normalize_ollama_host(host):
+        host = (host or "localhost:11434").replace("http://", "").replace("https://", "").strip()
+        if ":" not in host:
+            host = f"{host}:11434"
+        return host
+
     default_settings = {
         "ports": [22, 80, 443, 445, 3389],
         "timeout": 0.5,
@@ -174,8 +156,19 @@ def load_settings_xml(filepath="settings_dev.xml"):
         "smb_share": "",
         "smb_username": "",
         "valid_external_ranges": [],
-        "OllamaHost": "localhost",
-        "OllamaModel": "llama3.2"
+        "default_ai_provider": "ollama",
+        "ollama_host": "localhost:11434",
+        "ollama_model": "llama3.2",
+        "openai_api_key": "",
+        "openai_model": "gpt-4",
+        "cve_source": "nvd",
+        "nvd_api_key": "",
+        "cve_cache_ttl_days": 30,
+        "adaptive_escalation_threshold": 2,
+        "adaptive_peer_escalation_threshold": 1,
+        "adaptive_max_escalated_hosts": 25,
+        "adaptive_high_value_ports": None,
+        "adaptive_notable_version_patterns": None,
     }
     if not os.path.exists(filepath):
         print_status("settings.xml not found. Using default settings.", "warning")
@@ -191,7 +184,27 @@ def load_settings_xml(filepath="settings_dev.xml"):
         smb_server = smb.findtext("Server") if smb is not None else ""
         smb_share = smb.findtext("Share") if smb is not None else ""
         smb_username = smb.findtext("Username") if smb is not None else ""
+        openai = root.find("OpenAI")
         valid_ranges = [r.text.strip() for r in root.findall(".//ValidExternalRanges/Range") if r.text]
+
+        cve = root.find("CVE")
+        cve_source = (cve.findtext("Source") if cve is not None else None) or default_settings["cve_source"]
+        nvd_api_key = (cve.findtext("NVDApiKey") if cve is not None else None) or default_settings["nvd_api_key"]
+        cve_cache_ttl_raw = cve.findtext("CacheTTLDays") if cve is not None else None
+        cve_cache_ttl_days = int(cve_cache_ttl_raw) if cve_cache_ttl_raw else default_settings["cve_cache_ttl_days"]
+
+        adaptive = root.find("AdaptiveScan")
+        def _adaptive_int(tag, default):
+            raw = adaptive.findtext(tag) if adaptive is not None else None
+            return int(raw) if raw else default
+        adaptive_escalation_threshold = _adaptive_int("EscalationThreshold", default_settings["adaptive_escalation_threshold"])
+        adaptive_peer_escalation_threshold = _adaptive_int("PeerEscalationThreshold", default_settings["adaptive_peer_escalation_threshold"])
+        adaptive_max_escalated_hosts = _adaptive_int("MaxEscalatedHosts", default_settings["adaptive_max_escalated_hosts"])
+        high_value_ports_raw = adaptive.findtext("HighValuePorts") if adaptive is not None else None
+        adaptive_high_value_ports = [int(p.strip()) for p in high_value_ports_raw.split(",")] if high_value_ports_raw else None
+        pattern_nodes = adaptive.findall("./NotableVersionPatterns/Pattern") if adaptive is not None else []
+        adaptive_notable_version_patterns = [p.text.strip() for p in pattern_nodes if p.text] or None
+
         settings = {
             "ports": [int(p.strip()) for p in ports.split(",")] if ports else default_settings["ports"],
             "timeout": float(timeout) if timeout else default_settings["timeout"],
@@ -201,118 +214,68 @@ def load_settings_xml(filepath="settings_dev.xml"):
             "smb_share": smb_share,
             "smb_username": smb_username,
             "valid_external_ranges": valid_ranges or default_settings["valid_external_ranges"],
-            "OllamaHost": root.findtext("OllamaHost") or default_settings["OllamaHost"],
-            "OllamaModel": root.findtext("OllamaModel") or default_settings["OllamaModel"]
+            "default_ai_provider": (root.findtext("DefaultAIProvider") or default_settings["default_ai_provider"]).lower(),
+            "ollama_host": normalize_ollama_host(root.findtext("OllamaHost") or default_settings["ollama_host"]),
+            "ollama_model": root.findtext("OllamaModel") or default_settings["ollama_model"],
+            "openai_api_key": openai.findtext("APIKey") if openai is not None and openai.findtext("APIKey") else default_settings["openai_api_key"],
+            "openai_model": openai.findtext("Model") if openai is not None and openai.findtext("Model") else default_settings["openai_model"],
+            "cve_source": cve_source.lower(),
+            "nvd_api_key": nvd_api_key,
+            "cve_cache_ttl_days": cve_cache_ttl_days,
+            "adaptive_escalation_threshold": adaptive_escalation_threshold,
+            "adaptive_peer_escalation_threshold": adaptive_peer_escalation_threshold,
+            "adaptive_max_escalated_hosts": adaptive_max_escalated_hosts,
+            "adaptive_high_value_ports": adaptive_high_value_ports,
+            "adaptive_notable_version_patterns": adaptive_notable_version_patterns,
         }
         return settings
     except Exception as e:
         print_status(f"Error loading settings.xml: {e}", "error")
         return default_settings
 
-CUSTOM_SETTINGS = load_settings_xml()
-
-def check_ollama():
-    host = CUSTOM_SETTINGS.get("ollama_host", "localhost:11434")
-
-    try:
-        response = requests.get(f"http://{host}/api/status", timeout=3)
-        if response.status_code == 200:
-            print_status("[+] Ollama service is running (/api/status check)", "info")
-            return True
-        else:
-            print_status(f"[~] /api/status returned {response.status_code}", "warning")
-    except requests.RequestException as e:
-        print_status(f"[!] /api/status unreachable: {e}", "warning")
-
-    try:
-        response = requests.get(f"http://{host}/api/version", timeout=3)
-        if response.status_code == 200:
-            print_status("[+] Ollama service is running (/api/version check)", "info")
-            return True
-        else:
-            print_status(f"[~] /api/version returned {response.status_code}", "warning")
-    except requests.RequestException as e:
-        print_status(f"[!] /api/version unreachable: {e}", "warning")
-
-    print_status("[-] Ollama does not appear to be running correctly.", "error")
-    return False
-
-
-def ollama_chat(system_prompt, user_prompt, model=None):
-    import json
-
-    host = CUSTOM_SETTINGS.get("ollama_host", "localhost:11434").replace("http://", "").replace("https://", "")
-    model = model or CUSTOM_SETTINGS.get("ollama_model", "llama3.2")
-    url = f"http://{host}/api/chat"
-
-    payload = {
-        "model": model,
-        "stream": True,  # Request streamed response
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-    }
-
-    try:
-        response = requests.post(url, json=payload, stream=True, timeout=30)
-
-        content_accumulator = []
-        for line in response.iter_lines(decode_unicode=True):
-            if not line.strip():
-                continue
-            try:
-                chunk = json.loads(line)
-                content_piece = chunk.get("message", {}).get("content", "")
-                if content_piece:
-                    content_accumulator.append(content_piece)
-            except json.JSONDecodeError as e:
-                print_status(f"[!] Stream chunk parse failed: {e}", "warning")
-
-        return "".join(content_accumulator).strip()
-
-    except requests.RequestException as e:
-        print_status(f"[!] Ollama streaming request failed: {e}", "error")
-        return "⚠️ Ollama Error: Failed to connect to Ollama. Please check that Ollama is downloaded, running and accessible."
-
-def set_custom_settings(settings):
-    global CUSTOM_SETTINGS
-    CUSTOM_SETTINGS = settings
-
-
 def set_verbosity(level):
     global VERBOSITY
     VERBOSITY = level
 
-def save_scan_output(host, filename, content, base_dir=None):
-    """
-    Saves output content to <base_dir>/Scan-Data/<host>/<filename>
-    """
-    if base_dir is None:
-        base_dir = os.getcwd()
-    elif os.path.isfile(base_dir):
-        base_dir = os.path.dirname(base_dir)
-    elif base_dir.endswith(".md"):
-        base_dir = os.path.dirname(base_dir)
 
+def check_dependencies(scan=False, ai=False, upload=False, pdf=False, ai_config=None):
+    checks = []
 
+    if scan:
+        checks.append(("nmap CLI", shutil.which("nmap") is not None, "Install nmap and ensure it is in PATH."))
+        checks.append(("python-nmap", importlib.util.find_spec("nmap") is not None, "Install Python dependencies with `pip install -r requirements.txt`."))
 
+    if ai and ai_config is not None:
+        if ai_config.provider == "openai":
+            checks.append(("openai", importlib.util.find_spec("openai") is not None, "Install Python dependencies with `pip install -r requirements.txt`."))
+            api_key = ai_config.openai_api_key
+            checks.append(("OpenAI API key", bool(api_key and "apikey" not in api_key.lower()), "Set OpenAI/APIKey in settings.xml."))
+        else:
+            from utils.ai_client import AIClient  # local import: avoids a circular import with utils.common
+            checks.append(("Ollama service", AIClient(ai_config).available(), "Start Ollama or disable AI analysis."))
 
+    if upload:
+        checks.append(("impacket", importlib.util.find_spec("impacket") is not None, "Install Python dependencies with `pip install -r requirements.txt`."))
 
-    full_path = os.path.join(base_dir, "Scan-Data", host)
-    os.makedirs(full_path, exist_ok=True)
+    if pdf:
+        checks.append(("markdown", importlib.util.find_spec("markdown") is not None, "Install Python dependencies with `pip install -r requirements.txt`."))
+        checks.append(("weasyprint", importlib.util.find_spec("weasyprint") is not None, "Install Python dependencies with `pip install -r requirements.txt`."))
 
-    file_path = os.path.join(full_path, filename)
-    try:
-        with open(file_path, "w") as f:
-            f.write(content)
-        print_status(f"[+] Saved scan output to {file_path}", "info")
-    except Exception as e:
-        print_status(f"[!] Failed to write {file_path}: {e}", "error")
+    missing = []
+    for name, ok, fix in checks:
+        if ok:
+            print_status(f"Dependency OK: {name}", "debug")
+        else:
+            missing.append((name, fix))
+            print_status(f"Missing dependency: {name}. {fix}", "warning")
+
+    return missing
 
 
 def convert_markdown_to_pdf(md_path, output_path=None):
     try:
+        import markdown
+        from weasyprint import HTML
 
         # Suppress all font and rendering logs
         for noisy_logger in [
@@ -341,5 +304,3 @@ def convert_markdown_to_pdf(md_path, output_path=None):
         print_status("❌ WeasyPrint or markdown module not found. Install with `pip install weasyprint markdown`", "error")
     except Exception as e:
         print_status(f"❌ PDF export failed: {e}", "error")
-
-
