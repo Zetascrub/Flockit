@@ -71,6 +71,12 @@ PR00099/
 - Manages registration and loading of static and approved AI-generated plugins from `modules/plugins`
 - AI-generated candidates are written to `modules/plugins_quarantine/` only — never auto-loaded or auto-trusted
 - Registers plugins using `.should_run()` matching logic
+### 📦 Built-in Plugins
+- `http_scan` - grabs HTTP banner
+- `ftp_scan` - captures FTP welcome message
+- `ssh_scan` - collects SSH server banner
+- `smb_scan` - lists SMB shares anonymously
+
 
 ### 🎯 CVE Lookup (`modules/cve_lookup.py`)
 - Matches each scanned service against the NVD CVE API 2.0, preferring nmap's own CPE string for precise matching
@@ -170,6 +176,16 @@ Target path is:
 smb://<IP>/Media/Projects/<project_name>/<project_name>.zip
 ```
 You’ll be prompted to enter credentials.
+
+## 🌐 Result Collector Server
+
+A basic Flask server (`results_server.py`) is included to receive zipped scan results. Run it on a system with network access:
+
+```bash
+python3 results_server.py
+```
+
+Configure Flock-It with `--server-url http://<server>:8000/upload` to send results after each loop.
 
 ---
 

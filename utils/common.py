@@ -15,6 +15,8 @@ except ImportError:
     def cprint(text, color=None, attrs=None):
         print(text)
 
+VERBOSITY = ""
+
 if os.name == "nt":
     import msvcrt
 else:
@@ -205,6 +207,7 @@ def load_settings_xml(filepath="settings_dev.xml"):
         pattern_nodes = adaptive.findall("./NotableVersionPatterns/Pattern") if adaptive is not None else []
         adaptive_notable_version_patterns = [p.text.strip() for p in pattern_nodes if p.text] or None
 
+        valid_ranges = [r.text.strip() for r in root.findall(".//ValidExternalRanges/Range") if r.text]
         settings = {
             "ports": [int(p.strip()) for p in ports.split(",")] if ports else default_settings["ports"],
             "timeout": float(timeout) if timeout else default_settings["timeout"],

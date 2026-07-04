@@ -7,3 +7,4 @@ openai
 markdown
 markdown2
 weasyprint
+flask

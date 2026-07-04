@@ -13,3 +13,4 @@ Plugin_Dev/*
 .idea/*
 modules/plugins/ai-gen*
 modules/plugins_quarantine/*
+.venv/

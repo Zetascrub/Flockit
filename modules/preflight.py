@@ -330,16 +330,19 @@ class PreFlight:
         print_status(f"[*] Scanning common ports on {ip}...", "info")
         config = self.ctx.config
         open_ports = []
-        for port in config.ports:
+
+        def scan_port(port):
             try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(config.timeout)
-                result = sock.connect_ex((ip, port))
-                if result == 0:
-                    open_ports.append(port)
-                sock.close()
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(config.timeout)
+                    if sock.connect_ex((ip, port)) == 0:
+                        open_ports.append(port)
             except socket.error:
-                continue
+                pass
+
+        max_workers = min(len(config.ports), 10)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            executor.map(scan_port, config.ports)
         if open_ports:
             print_status(f"[+] Open ports on {ip}: {open_ports}", "info")
         else:
