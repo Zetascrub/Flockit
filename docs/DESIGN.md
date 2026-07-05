@@ -60,6 +60,7 @@ The current implementation is organized around bird-themed modules:
 
 9. Reporting runs through `Reporter.generate_report()`:
    - A markdown report is generated: Top Findings, factual scan summary, then per-host tables (port/service/version/banner, CVE matches, AI recommendation, plugin output, artifacts).
+   - CSV appendices are written beside the report for findings (`findings.csv`) and open services (`open_services.csv`).
    - If requested, markdown is converted to PDF with WeasyPrint.
    - The report is printed only if the view-report prompt/automation flag says yes; otherwise nothing further happens.
 
@@ -71,7 +72,7 @@ The current implementation is organized around bird-themed modules:
 
 `Config` (`utils/config.py`) is built by `Config.load(xml_path, cli_args)`, which parses the settings XML via `load_settings_xml` (kept in `utils/common.py` as the low-level XML→dict parser) and layers CLI overrides on top. Nested dataclasses:
 
-- `AIProviderConfig`: `provider`, `ollama_host`, `ollama_model`, `openai_api_key`, `openai_model`.
+- `AIProviderConfig`: `provider`, `ollama_host`, `ollama_model` (fast/default analysis model), `ollama_report_model` (final finding/report narration model), `openai_api_key`, `openai_model`, `openai_report_model`.
 - `SMBConfig`: `server`, `share`, `username`.
 - `CVEConfig`: `source` (`nvd`|`off`), `nvd_api_key`, `cache_ttl_days`, `request_timeout`.
 - `AdaptiveScanConfig`: `escalation_threshold`, `peer_escalation_threshold`, `max_escalated_hosts`, `high_value_ports`, `notable_version_patterns`, `service_overexposure_thresholds`.
@@ -178,7 +179,7 @@ Implemented boundaries:
 - `CVELookupClient`/`CVECache` (`modules/cve_lookup.py`): provider-neutral, deterministic CVE matching against NVD, cached locally per project.
 - `correlation` (`modules/correlation.py`): deterministic cross-host correlation into `Finding`s, plus optional AI narration on top.
 - `AIClient` (`utils/ai_client.py`): provider-neutral wrapper for Ollama/OpenAI, used by per-port analysis, plugin generation, and finding narration alike.
-- `Reporter` (`modules/reporter.py`): markdown/PDF report generation from the stable `ScanRun`/`Finding` schema.
+- `Reporter` (`modules/reporter.py`): markdown/PDF report generation and CSV exports from the stable `ScanRun`/`Finding` schema.
 - `ArtifactStore` (`utils/artifacts.py`): all file writes under a project root.
 
 Actual data flow:
@@ -205,4 +206,3 @@ CLI args
 - SMB upload should avoid prompting for credentials in automation unless credentials are provided securely.
 - Reports clearly separate deterministic facts (port tables, CVE matches, cross-host findings) from AI-generated narrative (per-port recommendations, finding narration).
 - CVE matching calls out to `services.nvd.nist.gov` over the network; disable with `--cve-source off` if the engagement requires fully offline operation.
-

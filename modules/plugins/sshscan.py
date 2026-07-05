@@ -18,7 +18,11 @@ class SSHScan(ScanPlugin):
         result = {}
         try:
             with socket.create_connection((host, port), timeout=3) as s:
-                banner = s.recv(1024).decode("utf-8", "ignore").strip()
+                raw = s.recv(1024).decode("utf-8", "ignore")
+                # The identification string (RFC 4253 §4.2) is a single CR-LF-terminated
+                # line; recv() often also picks up the start of the binary KEXINIT packet
+                # that follows immediately after, so only keep the first line as the banner.
+                banner = raw.split("\n", 1)[0].strip()
             result["banner"] = banner
             print_status(f"[SSHScan] Banner: {banner or 'none'}", "success")
             if banner and OLD_VERSION_PATTERN.search(banner):

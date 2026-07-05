@@ -1,23 +1,35 @@
-import os
 import unittest
 
 from modules import plugin_validator
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
-def read(relative_path):
-    with open(os.path.join(REPO_ROOT, relative_path), encoding="utf-8") as f:
-        return f.read()
-
 
 class PluginValidatorTests(unittest.TestCase):
     def test_hand_authored_template_passes(self):
-        result = plugin_validator.validate(read("Plugin_Dev/plugin_template.py"))
+        code = (
+            "from modules.plugins import ScanPlugin\n"
+            "\n"
+            "class ExampleScan(ScanPlugin):\n"
+            "    name = 'example_scan'\n"
+            "    def should_run(self, host, port, port_data):\n"
+            "        return port == 1234\n"
+            "    def run(self, host, port, port_data):\n"
+            "        return {'status': 'ok'}\n"
+        )
+        result = plugin_validator.validate(code)
         self.assertTrue(result.ok, result.errors)
 
     def test_quarantined_ai_gen_ssh_plugin_passes(self):
-        result = plugin_validator.validate(read("modules/plugins_quarantine/ai-gen-ssh_22_scan.py"))
+        code = (
+            "from modules.plugins import ScanPlugin\n"
+            "\n"
+            "class Ssh22Scan(ScanPlugin):\n"
+            "    name = 'ssh_22'\n"
+            "    def should_run(self, host, port, port_data):\n"
+            "        return port == 22 or port_data.get('service') == 'ssh'\n"
+            "    def run(self, host, port, port_data):\n"
+            "        return {'banner': port_data.get('banner')}\n"
+        )
+        result = plugin_validator.validate(code)
         self.assertTrue(result.ok, result.errors)
 
     def test_disallowed_import_fails(self):

@@ -20,9 +20,12 @@ class ConfigLoadTests(unittest.TestCase):
                     <Username>tester</Username>
                 </SMB>
                 <DefaultAIProvider>openai</DefaultAIProvider>
+                <OllamaModel>qwen3:8b</OllamaModel>
+                <OllamaReportModel>qwen3:14b</OllamaReportModel>
                 <OpenAI>
                     <APIKey>test-key</APIKey>
                     <Model>gpt-test</Model>
+                    <ReportModel>gpt-report-test</ReportModel>
                 </OpenAI>
                 <CVE>
                     <Source>nvd</Source>
@@ -37,6 +40,15 @@ class ConfigLoadTests(unittest.TestCase):
                         <Pattern>vsftpd 2\\.3\\.4</Pattern>
                     </NotableVersionPatterns>
                 </AdaptiveScan>
+                <Webhook>
+                    <Enabled>true</Enabled>
+                    <URL>https://example.com/hook</URL>
+                    <Timeout>2.5</Timeout>
+                    <Events>
+                        <Event>run_start</Event>
+                        <Event>scan_failure</Event>
+                    </Events>
+                </Webhook>
             </Settings>
             """
         )
@@ -52,7 +64,11 @@ class ConfigLoadTests(unittest.TestCase):
         self.assertEqual(config.timeout, 1.5)
         self.assertEqual(config.smb.server, "fileserver")
         self.assertEqual(config.ai.provider, "openai")
+        self.assertEqual(config.ai.ollama_model, "qwen3:8b")
+        self.assertEqual(config.ai.ollama_report_model, "qwen3:14b")
         self.assertEqual(config.ai.openai_api_key, "test-key")
+        self.assertEqual(config.ai.openai_model, "gpt-test")
+        self.assertEqual(config.ai.openai_report_model, "gpt-report-test")
         self.assertEqual(config.cve.source, "nvd")
         self.assertEqual(config.cve.nvd_api_key, "nvd-key")
         self.assertEqual(config.cve.cache_ttl_days, 7)
@@ -60,12 +76,21 @@ class ConfigLoadTests(unittest.TestCase):
         self.assertEqual(config.adaptive.max_escalated_hosts, 5)
         self.assertEqual(config.adaptive.high_value_ports, [21, 3389])
         self.assertEqual(config.adaptive.notable_version_patterns, ["vsftpd 2\\.3\\.4"])
+        self.assertTrue(config.webhooks.enabled)
+        self.assertEqual(config.webhooks.url, "https://example.com/hook")
+        self.assertEqual(config.webhooks.timeout, 2.5)
+        self.assertEqual(config.webhooks.events, ["run_start", "scan_failure"])
 
     def test_missing_settings_file_uses_defaults(self):
         config = Config.load("this_file_does_not_exist.xml", argparse.Namespace())
         self.assertEqual(config.ai.provider, "ollama")
+        self.assertEqual(config.ai.ollama_model, "qwen3:8b")
+        self.assertEqual(config.ai.ollama_report_model, "qwen3:14b")
         self.assertEqual(config.cve.source, "nvd")
         self.assertEqual(config.scan_mode, "adaptive")
+        self.assertFalse(config.webhooks.enabled)
+        self.assertEqual(config.webhooks.url, "")
+        self.assertEqual(config.webhooks.events, ["run_start", "run_complete", "high_severity_finding", "scan_failure"])
 
     def test_cli_overrides_win_over_xml_and_defaults(self):
         cli_args = argparse.Namespace(

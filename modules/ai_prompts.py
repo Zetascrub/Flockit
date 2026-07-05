@@ -26,20 +26,22 @@ def format_ai_summary(summary, port_info=None, format_type="markdown"):
     summary = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 (\2)", summary)
     summary = summary.replace("**", "").replace("`", "")
     summary = re.sub(r"^```[a-z]*", "", summary, flags=re.MULTILINE)
+    summary = re.sub(r"^(bash|sh|shell|powershell|python)\s*$", "", summary, flags=re.IGNORECASE | re.MULTILINE)
     summary = re.sub(r"^</?details.*?>", "", summary, flags=re.IGNORECASE)
     summary = re.sub(r"</?summary.*?>", "", summary, flags=re.IGNORECASE)
+    summary = re.sub(r"\n{3,}", "\n\n", summary).strip()
 
     width = 70  # For safe rendering in PDF with proportional fonts
 
     if format_type == "markdown":
         return f"""<details>
-    <summary><strong>AI Recommendations for {port_label}</strong></summary>
+<summary><strong>AI Recommendations for {port_label}</strong></summary>
 
-    ```markdown
-    {summary}
-    ```
+```markdown
+{summary}
+```
 
-    </details>"""
+</details>"""
 
     elif format_type == "plain":
         return f"AI Recommendations for {port_label}:\n\n{summary}"

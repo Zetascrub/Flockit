@@ -1,10 +1,36 @@
 import socket
+import re
 
 from modules.plugins import ScanPlugin
 from utils.common import print_status
 
 HTTP_PORTS = {80, 8080, 8000, 8008, 8081, 8888}
 HTTP_SERVICES = {"http", "http-proxy", "http-alt"}
+SECURITY_HEADERS = {
+    "strict-transport-security",
+    "content-security-policy",
+    "x-frame-options",
+    "x-content-type-options",
+    "referrer-policy",
+}
+
+
+def _parse_headers(lines):
+    headers = {}
+    for line in lines:
+        if not line:
+            break
+        if ":" in line:
+            key, _, value = line.partition(":")
+            headers[key.strip().lower()] = value.strip()
+    return headers
+
+
+def _extract_title(body):
+    match = re.search(r"<title[^>]*>(.*?)</title>", body, re.IGNORECASE | re.DOTALL)
+    if not match:
+        return ""
+    return re.sub(r"\s+", " ", match.group(1)).strip()[:120]
 
 
 class HTTPScan(ScanPlugin):
@@ -28,19 +54,20 @@ class HTTPScan(ScanPlugin):
                     response += chunk
 
             text = response.decode("utf-8", "ignore")
-            lines = text.split("\r\n")
+            header_text, _, body = text.partition("\r\n\r\n")
+            lines = header_text.split("\r\n")
             status_line = lines[0].strip() if lines else ""
-            headers = {}
-            for line in lines[1:]:
-                if not line:
-                    break
-                if ":" in line:
-                    key, _, value = line.partition(":")
-                    headers[key.strip().lower()] = value.strip()
+            headers = _parse_headers(lines[1:])
 
             result["banner"] = status_line
             result["status_line"] = status_line
             result["server"] = headers.get("server", "")
+            result["location"] = headers.get("location", "")
+            result["title"] = _extract_title(body)
+            result["security_headers"] = {name: headers.get(name, "") for name in sorted(SECURITY_HEADERS)}
+            result["missing_security_headers"] = [
+                name for name in sorted(SECURITY_HEADERS) if not headers.get(name)
+            ]
             print_status(f"[HTTPScan] {status_line} (Server: {result['server'] or 'unknown'})", "success")
         except Exception as e:
             print_status(f"[HTTPScan] Error: {e}", "warning")

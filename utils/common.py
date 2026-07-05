@@ -160,9 +160,11 @@ def load_settings_xml(filepath="settings_dev.xml"):
         "valid_external_ranges": [],
         "default_ai_provider": "ollama",
         "ollama_host": "localhost:11434",
-        "ollama_model": "llama3.2",
+        "ollama_model": "qwen3:8b",
+        "ollama_report_model": "qwen3:14b",
         "openai_api_key": "",
         "openai_model": "gpt-4",
+        "openai_report_model": "gpt-4",
         "cve_source": "nvd",
         "nvd_api_key": "",
         "cve_cache_ttl_days": 30,
@@ -171,6 +173,10 @@ def load_settings_xml(filepath="settings_dev.xml"):
         "adaptive_max_escalated_hosts": 25,
         "adaptive_high_value_ports": None,
         "adaptive_notable_version_patterns": None,
+        "webhook_enabled": False,
+        "webhook_url": "",
+        "webhook_events": None,
+        "webhook_timeout": 5.0,
     }
     if not os.path.exists(filepath):
         print_status("settings.xml not found. Using default settings.", "warning")
@@ -208,6 +214,15 @@ def load_settings_xml(filepath="settings_dev.xml"):
         adaptive_notable_version_patterns = [p.text.strip() for p in pattern_nodes if p.text] or None
 
         valid_ranges = [r.text.strip() for r in root.findall(".//ValidExternalRanges/Range") if r.text]
+
+        webhook = root.find("Webhook")
+        webhook_enabled = ((webhook.findtext("Enabled") if webhook is not None else None) or "").strip().lower() == "true"
+        webhook_url = (webhook.findtext("URL") if webhook is not None else None) or default_settings["webhook_url"]
+        webhook_timeout_raw = webhook.findtext("Timeout") if webhook is not None else None
+        webhook_timeout = float(webhook_timeout_raw) if webhook_timeout_raw else default_settings["webhook_timeout"]
+        webhook_event_nodes = webhook.findall("./Events/Event") if webhook is not None else []
+        webhook_events = [e.text.strip() for e in webhook_event_nodes if e.text] or None
+
         settings = {
             "ports": [int(p.strip()) for p in ports.split(",")] if ports else default_settings["ports"],
             "timeout": float(timeout) if timeout else default_settings["timeout"],
@@ -220,8 +235,12 @@ def load_settings_xml(filepath="settings_dev.xml"):
             "default_ai_provider": (root.findtext("DefaultAIProvider") or default_settings["default_ai_provider"]).lower(),
             "ollama_host": normalize_ollama_host(root.findtext("OllamaHost") or default_settings["ollama_host"]),
             "ollama_model": root.findtext("OllamaModel") or default_settings["ollama_model"],
+            "ollama_report_model": root.findtext("OllamaReportModel") or root.findtext("OllamaModel") or default_settings["ollama_report_model"],
             "openai_api_key": openai.findtext("APIKey") if openai is not None and openai.findtext("APIKey") else default_settings["openai_api_key"],
             "openai_model": openai.findtext("Model") if openai is not None and openai.findtext("Model") else default_settings["openai_model"],
+            "openai_report_model": openai.findtext("ReportModel") if openai is not None and openai.findtext("ReportModel") else (
+                openai.findtext("Model") if openai is not None and openai.findtext("Model") else default_settings["openai_report_model"]
+            ),
             "cve_source": cve_source.lower(),
             "nvd_api_key": nvd_api_key,
             "cve_cache_ttl_days": cve_cache_ttl_days,
@@ -230,6 +249,10 @@ def load_settings_xml(filepath="settings_dev.xml"):
             "adaptive_max_escalated_hosts": adaptive_max_escalated_hosts,
             "adaptive_high_value_ports": adaptive_high_value_ports,
             "adaptive_notable_version_patterns": adaptive_notable_version_patterns,
+            "webhook_enabled": webhook_enabled,
+            "webhook_url": webhook_url,
+            "webhook_events": webhook_events,
+            "webhook_timeout": webhook_timeout,
         }
         return settings
     except Exception as e:

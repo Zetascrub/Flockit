@@ -25,6 +25,7 @@ Sift is an all-in-one pentest automation framework designed to streamline the re
 - 🪄 AI-assisted plugin generation with a mandatory quarantine + review step (`sift.py plugins list/show/approve/reject`) before generated code is ever trusted
 - 🤖 Provider-neutral AI layer (Ollama or OpenAI) for per-port analysis, plugin generation, and finding narration
 - 📦 Auto SMB uploads to shared drives
+- 🔔 Optional, opt-in webhook notifications (run start/complete, high-severity findings, scan failures) — configured entirely locally in `settings.xml`, off by default
 - 🗂️ Structured scan and report directories per project
 - 🖼️ ASCII network visualization
 - 🔍 Scope-based scanning via `scope.txt`
@@ -41,6 +42,8 @@ PR00099/
 ├── summary.txt
 ├── scan_results.xml
 ├── report.md
+├── findings.csv
+├── open_services.csv
 ├── Screenshots/
 └── Scan-Data/
     └── 192.168.8.1/
@@ -65,6 +68,7 @@ PR00099/
 - In adaptive mode (default), quick-scans every host first, then uses `AdaptiveScanPlanner` (`modules/adaptive.py`) to decide which specific hosts warrant a deeper rescan
 - Automatically grabs banners
 - Invokes loaded plugins per port
+- `scan_web_targets()` actively probes `web_scope.txt` URLs with `http_scan`/`tls_scan` directly against the URL's own scheme/host/port — no nmap discovery needed, since the scheme is already explicit
 - Stores all plugin output under `Scan-Data/<host>/` via the `ArtifactStore`
 
 ### 🧩 Plugin Manager (`modules/plugin_manager.py`)
@@ -72,7 +76,9 @@ PR00099/
 - AI-generated candidates are written to `modules/plugins_quarantine/` only — never auto-loaded or auto-trusted
 - Registers plugins using `.should_run()` matching logic
 ### 📦 Built-in Plugins
-- `http_scan` - grabs HTTP banner
+- `http_scan` - grabs HTTP banner, title, and security headers
+- `tls_scan` - collects TLS handshake/certificate evidence and flags legacy protocol versions
+- `dns_scan` - checks for open DNS recursion and other safe DNS evidence
 - `ftp_scan` - captures FTP welcome message
 - `ssh_scan` - collects SSH server banner
 - `smb_scan` - lists SMB shares anonymously
@@ -88,6 +94,7 @@ PR00099/
 
 ### 📝 Reporter (`modules/reporter.py`)
 - Creates a rich markdown report (`report.md`) led by a ranked **Top Findings** section
+- Writes review-friendly CSV appendices for findings (`findings.csv`) and open services (`open_services.csv`)
 - Embeds host summaries, open ports, CVE matches, plugin results, and AI recommendations
 - Collapsible vulnerability insights using markdown `<details>`
 - Optionally opens the report automatically post-run
@@ -177,6 +184,26 @@ smb://<IP>/Media/Projects/<project_name>/<project_name>.zip
 ```
 You’ll be prompted to enter credentials.
 
+## 🔔 Webhooks
+
+Sift can optionally POST a JSON payload to a webhook URL for `run_start`, `run_complete`, `high_severity_finding` (critical/high correlation findings), and `scan_failure` events. Disabled by default — enable it in `settings.xml`:
+
+```xml
+<Webhook>
+    <Enabled>true</Enabled>
+    <URL>https://example.com/webhooks/sift</URL>
+    <Timeout>5</Timeout>
+    <Events>
+        <Event>run_start</Event>
+        <Event>run_complete</Event>
+        <Event>high_severity_finding</Event>
+        <Event>scan_failure</Event>
+    </Events>
+</Webhook>
+```
+
+Every payload includes `event`, `project`, and `timestamp`; a failed delivery only logs a warning and never interrupts the run.
+
 ## 🌐 Result Collector Server
 
 A basic Flask server (`results_server.py`) is included to receive zipped scan results. Run it on a system with network access:
@@ -205,6 +232,8 @@ pip install -r requirements.txt
 ```
 
 Copy `settings.example.xml` to `settings.xml` (or `settings_dev.xml`) and fill in your own values. Both `settings.xml` and `settings_dev.xml` are gitignored — never commit a settings file containing real API keys, SMB credentials, or other secrets.
+
+For local Ollama reporting, the default split is `qwen3:8b` for routine per-port analysis and `qwen3:14b` for final finding/report narration. Override `<OllamaModel>` and `<OllamaReportModel>` in settings if your hardware needs a different balance.
 
 ---
 

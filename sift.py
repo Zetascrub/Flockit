@@ -21,6 +21,7 @@ from utils.common import (
 )
 from utils.config import Config
 from utils.context import ProjectContext
+from utils.webhooks import WebhookNotifier
 
 version = "0.7.0"
 
@@ -144,6 +145,7 @@ def flock():
     # Step 1: Project setup
     project_number = args.project or input("Enter Project Number (default PR00000): ").strip() or "PR00000"
     ctx = ProjectContext.create(project_number, args.scope, config)
+    webhooks = WebhookNotifier(config.webhooks, project_number)
 
     pre = PreFlight(ctx)
     pre.setup()
@@ -160,22 +162,56 @@ def flock():
 
     # Step 3: Active Recon and Scanning
     recon_targets = pre.get_recon_targets()
-    if not recon_targets or not pre.prompt_recon():
-        print_status("Recon skipped.", "warning")
+    web_targets = pre.get_web_targets()
+
+    if not recon_targets and not web_targets:
+        print_status("No int/ext/web scope entries to scan.", "warning")
         return
 
-    if check_dependencies(scan=True):
-        print_status("Active scanning skipped because scan dependencies are missing.", "error")
-        return
+    run_network_recon = bool(recon_targets) and pre.prompt_recon()
+    if recon_targets and not run_network_recon:
+        print_status("Network recon skipped.", "warning")
 
-    scanner = Scanner(ctx, recon_targets)
-    live_hosts = scanner.discover_hosts()
-    if not live_hosts:
-        print_status("No live hosts found. Skipping active scanning.", "warning")
-        return
+    webhooks.run_start((recon_targets.split() if recon_targets else []) + web_targets)
+
+    scanner = Scanner(ctx, recon_targets or web_targets)
+
+    live_hosts = []
+    if run_network_recon:
+        if check_dependencies(scan=True):
+            print_status("Active scanning skipped because scan dependencies are missing.", "error")
+        else:
+            live_hosts = scanner.discover_hosts()
+            if not live_hosts:
+                print_status("No live hosts found. Skipping active scanning.", "warning")
 
     scan_run = scanner.scan_network(live_hosts)
+
+    # Step 3a: Active web probing. web_scope.txt entries already carry an
+    # explicit scheme/host/port, so this runs the http/tls plugins directly
+    # against each URL instead of going through nmap discovery.
+    if web_targets:
+        print_banner("Active Web Probing")
+        web_hosts = scanner.scan_web_targets(web_targets)
+        for host, hr in web_hosts.items():
+            if host in scan_run.hosts:
+                Scanner._merge_host_result(scan_run.hosts[host], hr)
+            else:
+                scan_run.hosts[host] = hr
+            if host not in scan_run.completeness.scanned_hosts:
+                scan_run.completeness.scanned_hosts.append(host)
+            if host not in scan_run.completeness.discovered_hosts:
+                scan_run.completeness.discovered_hosts.append(host)
+        print_status(f"[+] Web probing complete: {len(web_hosts)} web target(s) probed.", "success")
+
     print_banner("Active Scanning Phase Completed")
+
+    if not scan_run.hosts:
+        print_status("No scan results collected. Skipping remaining phases.", "warning")
+        return
+
+    for host, reason in scan_run.completeness.failed_hosts.items():
+        webhooks.scan_failure(host, reason)
 
     # Merge advisory preflight hints onto their matching hosts. nmap's active
     # scan remains the authoritative source of truth for port state; this is
@@ -200,6 +236,9 @@ def flock():
         print_banner("Cross-Host Correlation")
         findings = correlation.correlate(scan_run, config.adaptive)
         print_status(f"[+] Correlation complete: {len(findings)} cross-host finding(s).", "success")
+        for finding in findings:
+            if finding.severity in ("critical", "high"):
+                webhooks.high_severity_finding(finding)
 
     # Step 4: AI Vulnerability Analysis
     if scan_run.hosts and not args.no_ai and pre.prompt_ai():
@@ -250,6 +289,12 @@ def flock():
 
     if config.automation.general:
         print_status("Auto mode complete. All steps finished.", "success")
+
+    webhooks.run_complete(
+        hosts_scanned=len(scan_run.hosts),
+        findings_count=len(findings),
+        report_path=report_path,
+    )
 
     print("Done")
 

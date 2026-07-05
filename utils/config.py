@@ -24,6 +24,13 @@ DEFAULT_SERVICE_OVEREXPOSURE_THRESHOLDS = {
     "ssh": 10,
 }
 
+DEFAULT_WEBHOOK_EVENTS = [
+    "run_start",
+    "run_complete",
+    "high_severity_finding",
+    "scan_failure",
+]
+
 
 @dataclass
 class AutomationFlags:
@@ -38,9 +45,11 @@ class AutomationFlags:
 class AIProviderConfig:
     provider: str = "ollama"  # "ollama" | "openai"
     ollama_host: str = "localhost:11434"
-    ollama_model: str = "llama3.2"
+    ollama_model: str = "qwen3:8b"
+    ollama_report_model: str = "qwen3:14b"
     openai_api_key: str = ""
     openai_model: str = "gpt-4"
+    openai_report_model: str = "gpt-4"
 
 
 @dataclass
@@ -57,6 +66,16 @@ class CVEConfig:
     cache_path: str = ""  # resolved by ProjectContext to <project>/.cve_cache.sqlite3
     cache_ttl_days: int = 30
     request_timeout: float = 10.0
+
+
+@dataclass
+class WebhookConfig:
+    """Opt-in, local-only outbound notifications. Disabled unless a URL is
+    configured; `events` restricts which event types are actually POSTed."""
+    enabled: bool = False
+    url: str = ""
+    events: List[str] = field(default_factory=lambda: list(DEFAULT_WEBHOOK_EVENTS))
+    timeout: float = 5.0
 
 
 @dataclass
@@ -84,6 +103,7 @@ class Config:
     cve: CVEConfig
     adaptive: AdaptiveScanConfig
     automation: AutomationFlags
+    webhooks: WebhookConfig
     scan_mode: str = "adaptive"  # "quick" | "full" | "adaptive"
     external_ip: Optional[str] = None
 
@@ -100,14 +120,22 @@ class Config:
         ai = AIProviderConfig(
             provider=raw.get("default_ai_provider", "ollama"),
             ollama_host=raw.get("ollama_host", "localhost:11434"),
-            ollama_model=raw.get("ollama_model", "llama3.2"),
+            ollama_model=raw.get("ollama_model", "qwen3:8b"),
+            ollama_report_model=raw.get("ollama_report_model", raw.get("ollama_model", "qwen3:14b")),
             openai_api_key=raw.get("openai_api_key", ""),
             openai_model=raw.get("openai_model", "gpt-4"),
+            openai_report_model=raw.get("openai_report_model", raw.get("openai_model", "gpt-4")),
         )
         cve = CVEConfig(
             source=raw.get("cve_source", "nvd"),
             nvd_api_key=raw.get("nvd_api_key", ""),
             cache_ttl_days=raw.get("cve_cache_ttl_days", 30),
+        )
+        webhooks = WebhookConfig(
+            enabled=bool(raw.get("webhook_enabled", False)),
+            url=raw.get("webhook_url", ""),
+            events=raw.get("webhook_events") or list(DEFAULT_WEBHOOK_EVENTS),
+            timeout=raw.get("webhook_timeout", 5.0),
         )
         adaptive = AdaptiveScanConfig(
             escalation_threshold=raw.get("adaptive_escalation_threshold", 2),
@@ -148,5 +176,6 @@ class Config:
             cve=cve,
             adaptive=adaptive,
             automation=automation,
+            webhooks=webhooks,
             scan_mode=scan_mode,
         )

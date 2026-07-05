@@ -35,6 +35,8 @@ class CorrelationTests(unittest.TestCase):
         self.assertEqual(len(repeated), 1)
         self.assertEqual(sorted(repeated[0].affected_hosts), ["10.0.0.1", "10.0.0.2"])
         self.assertEqual(repeated[0].cve_ids, ["CVE-2023-1111"])
+        self.assertIn("CVE-2023-1111", repeated[0].description)
+        self.assertIn("vendor-recommended patch", repeated[0].recommendation)
 
     def test_same_vulnerable_version_detected_across_hosts(self):
         findings = correlation.correlate(self.scan_run, self.cfg)
@@ -43,6 +45,8 @@ class CorrelationTests(unittest.TestCase):
         self.assertEqual(len(version_findings), 1)
         self.assertIn("OpenSSH", version_findings[0].title)
         self.assertEqual(sorted(version_findings[0].affected_hosts), ["10.0.0.1", "10.0.0.2"])
+        self.assertIn("same vulnerable", version_findings[0].description)
+        self.assertIn("upgrade", version_findings[0].recommendation)
 
     def test_telnet_overexposure_fires_on_single_occurrence(self):
         findings = correlation.correlate(self.scan_run, self.cfg)
@@ -50,6 +54,8 @@ class CorrelationTests(unittest.TestCase):
 
         self.assertEqual(len(overexposure), 1)
         self.assertEqual(overexposure[0].affected_hosts, ["10.0.0.2"])
+        self.assertIn("exposed", overexposure[0].description)
+        self.assertIn("Restrict telnet exposure", overexposure[0].recommendation)
 
     def test_ssh_does_not_overexpose_on_single_occurrence(self):
         # Only host_a and host_b have ssh (2 hosts total), well under the
@@ -81,9 +87,73 @@ class CorrelationTests(unittest.TestCase):
 
         self.assertEqual(len(weakness), 1)
         self.assertEqual(sorted(weakness[0].affected_hosts), ["10.0.0.10", "10.0.0.11"])
+        self.assertIn("credential", weakness[0].description.lower())
+        self.assertIn("Disable anonymous", weakness[0].recommendation)
+
+    def test_dns_recursion_detected_from_plugin_output(self):
+        pr_a = PortResult(port=53, service="domain")
+        pr_a.plugin_results["dns_scan"] = {"recursion_check": {"recursion_available": True, "rcode": 0}}
+        pr_b = PortResult(port=53, service="domain")
+        pr_b.plugin_results["dns_scan"] = {"recursion_check": {"recursion_available": False, "rcode": 5}}
+
+        scan_run = ScanRun(hosts={
+            "10.0.0.10": HostResult(host="10.0.0.10", ports=[pr_a]),
+            "10.0.0.11": HostResult(host="10.0.0.11", ports=[pr_b]),
+        })
+
+        findings = correlation.correlate(scan_run, self.cfg)
+        dns_findings = [f for f in findings if f.category == "dns-recursion"]
+
+        self.assertEqual(len(dns_findings), 1)
+        self.assertEqual(dns_findings[0].affected_hosts, ["10.0.0.10"])
+        self.assertIn("recursion", dns_findings[0].description.lower())
+        self.assertIn("Restrict recursive DNS", dns_findings[0].recommendation)
+
+    def test_missing_security_headers_detected_from_web_plugin_output(self):
+        pr_a = PortResult(port=80, service="http")
+        pr_a.plugin_results["http_scan"] = {
+            "status_line": "HTTP/1.1 200 OK",
+            "missing_security_headers": ["content-security-policy", "x-frame-options"],
+        }
+        pr_b = PortResult(port=443, service="https")
+        pr_b.plugin_results["tls_scan"] = {"http_status_line": "HTTP/1.1 200 OK", "missing_security_headers": []}
+        pr_c = PortResult(port=8080, service="http-proxy")
+        pr_c.plugin_results["http_scan"] = {"error": "connection refused", "missing_security_headers": ["x-frame-options"]}
+
+        scan_run = ScanRun(hosts={
+            "example.com": HostResult(host="example.com", ports=[pr_a]),
+            "secure.example.com": HostResult(host="secure.example.com", ports=[pr_b]),
+            "broken.example.com": HostResult(host="broken.example.com", ports=[pr_c]),
+        })
+
+        findings = correlation.correlate(scan_run, self.cfg)
+        header_findings = [f for f in findings if f.category == "missing-security-headers"]
+
+        self.assertEqual(len(header_findings), 1)
+        self.assertEqual(header_findings[0].affected_hosts, ["example.com"])
+        self.assertIn("example.com:80", header_findings[0].evidence[0])
 
 
 class NarrateTests(unittest.TestCase):
+    def test_finding_prompt_includes_report_template_fields(self):
+        finding = correlation.Finding(
+            id="f1",
+            title="Finding 1",
+            severity="high",
+            category="repeated-cve",
+            description="Description text",
+            impact="Impact text",
+            recommendation="Recommendation text",
+            affected_hosts=["h1"],
+            evidence=["h1:22"],
+        )
+
+        prompt = correlation._build_finding_prompt(finding)
+
+        self.assertIn("Description: Description text", prompt)
+        self.assertIn("Impact: Impact text", prompt)
+        self.assertIn("Recommendation: Recommendation text", prompt)
+
     def test_narrate_only_touches_top_n_and_never_invents_findings(self):
         findings = [
             correlation.Finding(id=f"f{i}", title=f"Finding {i}", severity="high", category="repeated-cve", affected_hosts=["h1"])
@@ -98,6 +168,8 @@ class NarrateTests(unittest.TestCase):
         self.assertEqual(findings[1].narrative, "narrative text")
         self.assertIsNone(findings[2].narrative)
         self.assertEqual(ai_client.chat.call_count, 2)
+        for call in ai_client.chat.call_args_list:
+            self.assertTrue(call.kwargs["use_report_model"])
         self.assertEqual(len(findings), 5)  # narrate never adds/removes findings
 
 

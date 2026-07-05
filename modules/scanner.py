@@ -5,6 +5,7 @@ import os
 import re
 import socket
 from datetime import datetime
+from urllib.parse import urlparse
 
 from modules.adaptive import AdaptiveScanPlanner
 from modules.plugin_manager import PluginManager
@@ -47,8 +48,10 @@ class Scanner:
             mode=self.mode,
             started_at=datetime.now(),
         )
+        scan_run.completeness.discovered_hosts = sorted(live_hosts)
         if not live_hosts:
             print_status("[-] No live hosts found. Exiting.", "warning")
+            scan_run.completeness.notes.append("No live hosts discovered.")
             scan_run.finished_at = datetime.now()
             self.results = scan_run.hosts
             return scan_run
@@ -71,7 +74,10 @@ class Scanner:
     def _run_scan_phase(self, hosts, scan_arguments, scan_run: ScanRun):
         try:
             with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                future_to_host = {executor.submit(self.scan_host, host, scan_arguments): host for host in hosts}
+                future_to_host = {}
+                for host in hosts:
+                    scan_run.completeness.scan_arguments_by_host.setdefault(host, []).append(scan_arguments)
+                    future_to_host[executor.submit(self.scan_host, host, scan_arguments)] = host
                 for future in concurrent.futures.as_completed(future_to_host):
                     host = future_to_host[future]
                     try:
@@ -80,18 +86,33 @@ class Scanner:
                             self._merge_host_result(scan_run.hosts[host], hr)
                         else:
                             scan_run.hosts[host] = hr
+                        if host not in scan_run.completeness.scanned_hosts:
+                            scan_run.completeness.scanned_hosts.append(host)
                         print_status(f"[+] Scan completed for {host}", "success")
                     except Exception as exc:
+                        scan_run.completeness.failed_hosts[host] = str(exc)
                         print_status(f"[-] Error scanning {host}: {exc}", "error")
         except KeyboardInterrupt:
+            scan_run.completeness.notes.append("Scan interrupted by user.")
             print_status("[-] Scan interrupted by user. Shutting down.", "error")
+
+    @staticmethod
+    def _merge_artifacts(existing, new):
+        """Appends only artifacts not already present (by path). A rescan
+        re-saves the same deterministic filenames (e.g. nmap.csv), so a plain
+        extend() would list every artifact twice in the report/CSV exports."""
+        seen_paths = {artifact.path for artifact in existing}
+        for artifact in new:
+            if artifact.path not in seen_paths:
+                existing.append(artifact)
+                seen_paths.add(artifact.path)
 
     @staticmethod
     def _merge_host_result(existing: HostResult, new: HostResult):
         """Merge a deeper rescan's HostResult into the existing quick-scan
         HostResult: richer product/version/cpe/banner data wins, newly found
         ports are appended, and touched ports are marked escalated."""
-        existing.artifacts.extend(new.artifacts)
+        Scanner._merge_artifacts(existing.artifacts, new.artifacts)
         existing_by_port = {p.port: p for p in existing.ports}
         for new_port in new.ports:
             if new_port.port in existing_by_port:
@@ -102,7 +123,7 @@ class Scanner:
                 old_port.cpe = new_port.cpe or old_port.cpe
                 old_port.banner = new_port.banner or old_port.banner
                 old_port.plugin_results.update(new_port.plugin_results)
-                old_port.artifacts.extend(new_port.artifacts)
+                Scanner._merge_artifacts(old_port.artifacts, new_port.artifacts)
                 old_port.escalated = True
             else:
                 new_port.escalated = True
@@ -129,6 +150,53 @@ class Scanner:
             for pr in hr.ports:
                 if pr.escalated and not pr.escalation_reason:
                     pr.escalation_reason = reason
+
+    def scan_web_targets(self, web_targets) -> dict:
+        """Actively probes web_scope.txt URLs with the http_scan/tls_scan
+        plugins directly against the URL's own host/port/scheme, since these
+        targets don't need nmap discovery -- the scheme is already explicit.
+        Returns host -> HostResult, same shape as scan_network's output, so
+        callers can merge it straight into a ScanRun.hosts dict."""
+        results = {}
+        plugins_by_name = {plugin.name: plugin for plugin in self.plugin_manager.plugins}
+
+        for url in web_targets:
+            parsed = urlparse(url)
+            host = parsed.hostname
+            if not host:
+                print_status(f"[-] Could not parse a hostname from web target: {url}", "warning")
+                continue
+
+            scheme = parsed.scheme or "http"
+            port = parsed.port or (443 if scheme == "https" else 80)
+            plugin_name = "tls_scan" if scheme == "https" else "http_scan"
+
+            print_status(f"[~] Probing web target {url} ({host}:{port})...", "scan")
+            pr = PortResult(port=port, protocol="tcp", state="open", service=scheme)
+
+            plugin = plugins_by_name.get(plugin_name)
+            if plugin is not None:
+                try:
+                    result = plugin.run(host, port, self._plugin_view(pr))
+                    pr.plugin_results[plugin.name] = result
+                    if isinstance(result, dict):
+                        pr.banner = result.get("status_line") or result.get("http_status_line") or pr.banner
+                        artifact = self.ctx.artifacts.save_json(
+                            host, f"{plugin.name}_{port}_output.json", result,
+                            label=f"{plugin.name} Output ({port})", kind="plugin",
+                        )
+                        if artifact:
+                            pr.artifacts.append(artifact)
+                except Exception as e:
+                    print_status(f"❌ Web plugin {plugin_name} failed on {host}:{port} - {e}", "error")
+                    logging.exception(e)
+            else:
+                print_status(f"[-] {plugin_name} plugin not loaded; skipping evidence collection for {url}.", "warning")
+
+            hr = results.setdefault(host, HostResult(host=host))
+            hr.ports.append(pr)
+
+        return results
 
     def get_scan_arguments(self):
         if self.mode != "full":
@@ -181,6 +249,9 @@ class Scanner:
                 )
 
                 print_status(f"Scanning port {port} on {host}...", "scan")
+                if pr.state != "open":
+                    hr.ports.append(pr)
+                    continue
 
                 self.grab_banner(host, port, pr)
 
@@ -192,16 +263,16 @@ class Scanner:
 
                             if isinstance(result, dict):
                                 plugin_artifact = self.ctx.artifacts.save_json(
-                                    host, f"{plugin.name}_output.json", result,
-                                    label=f"{plugin.name} Output", kind="plugin",
+                                    host, f"{plugin.name}_{port}_output.json", result,
+                                    label=f"{plugin.name} Output ({port})", kind="plugin",
                                 )
                                 if plugin_artifact:
                                     pr.artifacts.append(plugin_artifact)
 
                                 if "banner" in result:
                                     banner_artifact = self.ctx.artifacts.save_text(
-                                        host, f"{plugin.name}_banner.txt", result["banner"],
-                                        label=f"{plugin.name} Banner", kind="banner",
+                                        host, f"{plugin.name}_{port}_banner.txt", result["banner"],
+                                        label=f"{plugin.name} Banner ({port})", kind="banner",
                                     )
                                     if banner_artifact:
                                         pr.artifacts.append(banner_artifact)

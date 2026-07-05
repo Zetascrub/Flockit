@@ -27,6 +27,7 @@ class ModelSerializationTests(unittest.TestCase):
         self.assertEqual(reloaded["hosts"]["192.168.1.10"]["ports"][0]["port"], 22)
         self.assertEqual(reloaded["hosts"]["192.168.1.10"]["ports"][0]["cve_matches"][0]["cve_id"], "CVE-2023-1234")
         self.assertEqual(reloaded["hosts"]["192.168.1.10"]["preflight_hint"]["responded"], True)
+        self.assertEqual(reloaded["completeness"]["discovered_hosts"], [])
 
     def test_finding_defaults_are_independent_across_instances(self):
         # Regression guard: dataclass mutable defaults must use field(default_factory=...),
@@ -37,6 +38,26 @@ class ModelSerializationTests(unittest.TestCase):
 
         self.assertEqual(f1.affected_hosts, ["host1"])
         self.assertEqual(f2.affected_hosts, [])
+
+    def test_finding_report_template_fields_default_to_none(self):
+        finding = Finding(id="a", title="A", severity="high", category="repeated-cve")
+
+        self.assertIsNone(finding.description)
+        self.assertIsNone(finding.impact)
+        self.assertIsNone(finding.recommendation)
+        self.assertIsNone(finding.cvss_vector)
+
+    def test_scan_completeness_defaults_are_independent_across_instances(self):
+        first = ScanRun()
+        second = ScanRun()
+
+        first.completeness.discovered_hosts.append("10.0.0.1")
+        first.completeness.failed_hosts["10.0.0.2"] = "timeout"
+        first.completeness.scan_arguments_by_host["10.0.0.1"] = ["-F"]
+
+        self.assertEqual(second.completeness.discovered_hosts, [])
+        self.assertEqual(second.completeness.failed_hosts, {})
+        self.assertEqual(second.completeness.scan_arguments_by_host, {})
 
 
 if __name__ == "__main__":

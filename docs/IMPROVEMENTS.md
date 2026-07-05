@@ -5,6 +5,231 @@ Reviewed from: current working tree, static review plus localhost flow run
 
 This backlog is ordered by risk and practical impact. Line references point to the reviewed working tree — `flockit.py`/`modules/raven.py`/`modules/owl.py`/`modules/magpie.py`/`modules/kea.py` in the citations below refer to files that have since been renamed to `sift.py`/`modules/scanner.py`/`modules/reporter.py`/`modules/plugin_manager.py`/`modules/ai_prompts.py` respectively (see `docs/DESIGN.md`); the citations are left as-is since they're historical evidence, not current paths.
 
+## Discovery Questionnaire
+
+Use this section to capture product, workflow, feature, and integration ideas before turning them into prioritized improvements. Answer inline under each question.
+
+### Core Purpose
+
+1. What do you see as the main job of this tool today?
+   - Answer: I see the main job of this tool is to help automate network penetration testing, internal and external specifically
+2. Who is the primary user: you, your team, customers, admins, or multiple roles?
+   - Answer: I'll be the primary user.
+3. What is the most common task someone uses it for?
+   - Answer: Network and port scanning
+4. What part of the current experience feels slow, clunky, or unclear?
+   - Answer: So far it just feels very simple
+5. If the tool could do one thing dramatically better, what would it be?
+   - Answer: I'd like the tool to be able to scan every port / service and perform tests as associated to it, including gathering evidence.
+
+### Features
+
+6. Are there any manual tasks you repeatedly do outside the tool that should be brought into it?
+   - Answer: Mostly gathering evidence of the findings / vulnerabilities
+7. What information do you wish the tool surfaced automatically?
+   - Answer: I'd like the tool to be able to scan open ports, check for findings and gather evidence, and when in a specific mode, it could attempt to perform exploits
+8. Are there workflows that need templates, presets, saved views, or bulk actions?
+   - Answer: I think a template for report generation would be worth it; typically for a finding we use, Name, Description, Impact, Recommendation, CVSSv4 vector.
+9. Should the tool support notifications, reminders, or alerts?
+   - Answer: Notifications and alerts would be very useful, this can include notifications via web hooks
+10. Would reporting, analytics, dashboards, or exports be useful?
+    - Answer: I think all those would be useful, however reporting and analytics I'd say are very important.
+
+### Integrations
+
+11. What other tools or services do you already use alongside this?
+    - Answer: I'd typically use Nessus Pro, so intergration to the API might be useful, for example I could use Nessus to do the initial scan, then this tool can monitor that scan and once it's completed, the tool can export the scan results and parse it and utilse it for the scanning phase.
+12. Are there systems it should read data from?
+    - Answer: No systems currently
+13. Are there systems it should write, sync, or push data to?
+    - Answer: No systems currently, ideally keep it local.
+14. Would calendar, email, Slack/Discord, CRM, accounting, maps, payments, or file storage integrations help?
+    - Answer: None of those intergration would work.
+15. Do you need API access, webhooks, or automations for third-party systems?
+    - Answer: API for Nessus, webhooks for other systems can be useful
+
+### Collaboration
+
+16. Does the tool need multiple users?
+    - Answer: For now, a single user
+17. Should different users have different permissions or roles?
+    - Answer: Nope, if it's single user, have full access
+18. Do people need comments, assignments, approval flows, or activity history?
+    - Answer: Not needed
+19. Should users be able to share records, links, reports, or views?
+    - Answer: Not applicable
+20. Do you need audit logs or accountability around changes?
+    - Answer: Logs of what has happened should always be kept
+
+### Data And Search
+
+21. What data matters most in the tool?
+    - Answer: Positive findings and valid vulnerabilites
+22. Is anything currently hard to find?
+    - Answer: No
+23. Would better filtering, tagging, sorting, or saved searches help?
+    - Answer: Yes, this can help.
+24. Do you need import/export from CSV, Excel, PDF, or another format?
+    - Answer: Export CSV/Excel is always useful
+25. Are there any data quality problems, duplicates, missing fields, or inconsistent naming?
+    - Answer: Not applicable
+
+### User Experience
+
+26. What screen do users spend the most time on?
+    - Answer: Currently the terminal to watch it flow
+27. What screen causes the most confusion?
+    - Answer: Not applicable
+28. Should the tool feel more like a dashboard, spreadsheet, calendar, kanban board, map, form system, or something else?
+    - Answer: I'm happy to keep it mostly a cli dashboard.
+29. What should be possible from mobile?
+    - Answer: Only notifications through webhooks at the users decision.
+30. Are there any accessibility or readability issues?
+    - Answer: No issues
+
+### Automation And AI
+
+31. What decisions or recommendations could the tool help with?
+    - Answer: It could help process large amounts of findings
+32. Are there repetitive steps that could be automated?
+    - Answer: Evidence gathering of findings
+33. Would AI-assisted summaries, drafting, categorization, search, or anomaly detection be useful?
+    - Answer: very useful
+34. Should the tool proactively suggest actions?
+    - Answer: yes, this would be helpful.
+35. Are there places where human approval must always stay in the loop?
+    - Answer: Generally any time an exploit is being used, but passive or non-harmful info gathering should be OK
+
+### Business And Operational Goals
+
+36. What outcome would make this tool feel 2x better?
+    - Answer: It would be amazing to have this tool essentially automate the scanning phase of a penetration test, gather evidence and suggest actions
+37. What outcome would save the most time or money?
+    - Answer: Ensuring that scanning is as perfect as possible where it can be left to its own devices while I focus on other tasks
+38. What needs to be measured to know improvements are working?
+    - Answer: ensure that all ports are scanned, any service detected is checked to ensure if it's a finding, evidence is gathered and if a Nessus export is used, all findings are checked.
+39. Are there upcoming business changes the tool should prepare for?
+    - Answer: Nope
+40. What features would make this feel more professional or scalable?
+    - Answer: Ensuring that all actions are smooth, nothing breaks and better organisaion of data.
+
+## Roadmap From Questionnaire
+
+The questionnaire points to a CLI-first, local-first pentest automation tool that should reduce the manual scanning phase of an engagement. The main product goal is:
+
+> Given a scope or Nessus scan, Sift should enumerate every reachable service, run relevant validation checks, gather evidence, organize the results, and produce a report-ready finding set while keeping exploit attempts behind explicit human approval.
+
+### Priority 1 - Evidence-Backed Service Validation
+
+- Build a service validation pipeline that runs after port discovery and before reporting.
+- Treat every open port as an evidence target: banner, protocol probe output, screenshots where relevant, raw tool output, and structured observations.
+- Expand plugin coverage beyond basic banners into service-specific checks for common ports and protocols.
+- Store evidence consistently per host/service/finding, with stable artifact names and labels.
+- Make "positive findings" the primary output, separating validated vulnerabilities from informational observations.
+
+Success criteria:
+
+- Every open port has a service record and evidence artifact.
+- Every finding has `Name`, `Description`, `Impact`, `Recommendation`, `CVSSv4 vector`, affected assets, and linked evidence.
+- Report output can be reviewed without manually hunting through raw scan folders.
+
+### Priority 2 - Full-Port And Adaptive Scan Confidence
+
+- Add a scan profile focused on complete coverage, including all TCP ports and optional UDP profiles.
+- Track scan completeness explicitly: target count, discovered host count, scanned port ranges, skipped hosts, failed scans, and retry status.
+- Improve adaptive scanning so deeper checks are not only "interesting host" based, but also "service requires follow-up" based.
+- Add resumable/retry behavior for interrupted or failed host scans.
+
+Success criteria:
+
+- The tool can prove that all configured ports were scanned.
+- Failed or incomplete scan segments are visible in the CLI dashboard and final report.
+- A completed run leaves little ambiguity about what was and was not tested.
+
+### Priority 3 - Nessus Pro Integration
+
+- Add Nessus API configuration for local settings, keeping credentials local.
+- Support launching or monitoring an existing Nessus scan.
+- When a Nessus scan completes, export the results, parse them, and import findings into Sift's data model.
+- Use Nessus findings as validation targets: confirm affected hosts/services, gather extra evidence, deduplicate findings, and enrich the report.
+- Support importing Nessus exports from disk for offline workflows.
+
+Success criteria:
+
+- Sift can consume a Nessus scan without replacing the local-first workflow.
+- Every imported Nessus finding is marked as checked, confirmed, not reproduced, duplicate, or needs manual review.
+- Nessus data and Sift-native evidence appear in one coherent report.
+
+### Priority 4 - Reporting, Analytics, And Exports
+
+- Add a configurable report template with the preferred finding structure: `Name`, `Description`, `Impact`, `Recommendation`, and `CVSSv4 vector`.
+- Add CSV and Excel exports for findings, affected assets, open services, and scan completeness.
+- Add engagement analytics: severity distribution, affected host counts, recurring services, confirmed vs unconfirmed findings, and scan coverage.
+- Keep markdown/PDF output, but make the finding model strong enough to support multiple export formats.
+
+Success criteria:
+
+- Findings are report-ready with minimal manual rewriting.
+- CSV/Excel exports are useful for review, triage, and client-facing appendices.
+- Analytics explain both risk and scan quality.
+
+### Priority 5 - CLI Dashboard And Operator Feedback
+
+- Keep the product primarily CLI-based, but make the run feel more like an operator dashboard.
+- Show current phase, active host/service, scan progress, findings count, evidence count, warnings, and failures.
+- Add filters and sorting for post-run review: severity, service, host, source, confirmed status, and finding type.
+- Preserve detailed logs for every run, including tool commands, decisions, errors, skipped actions, and webhook delivery attempts.
+
+Success criteria:
+
+- The terminal becomes the main control surface, not just scrolling output.
+- The operator can quickly tell whether the run is healthy, stuck, incomplete, or finding useful issues.
+- Logs are detailed enough to explain what happened after the fact.
+
+### Priority 6 - Notifications And Webhooks
+
+- Add optional webhooks for run start, run complete, confirmed finding, high/critical finding, scan failure, and human approval required.
+- Keep webhook configuration local and opt-in.
+- Include concise payloads with project, event type, severity, host/service, finding name, and artifact/report path where applicable.
+
+Success criteria:
+
+- Mobile/remote awareness is handled through user-chosen webhook receivers.
+- Notifications do not require collaboration features, accounts, or cloud storage.
+
+### Priority 7 - Gated Exploit Mode
+
+- Introduce an explicit mode for exploit attempts, separate from passive and non-harmful validation.
+- Require human approval before each exploit attempt or before a clearly defined batch of exploit attempts.
+- Record the approval decision, target, module/check used, command/config, result, and evidence.
+- Prefer safe validation checks before active exploitation wherever possible.
+
+Success criteria:
+
+- Passive recon and safe validation can run unattended.
+- Exploit attempts are deliberate, logged, and easy to exclude from normal runs.
+- Reports clearly distinguish exploit-confirmed findings from scanner-detected or safely validated findings.
+
+### Likely Build Order
+
+1. Normalize findings and evidence into a stronger internal data model.
+2. Add report templates and CSV/Excel exports on top of that model.
+3. Expand service plugins into evidence-backed validation checks.
+4. Add scan completeness tracking and resumable host/service tasks.
+5. Add Nessus import/export monitoring.
+6. Add CLI dashboard improvements and filters.
+7. Add webhooks.
+8. Add gated exploit mode.
+
+### Implemented From This Roadmap
+
+- Finding records now include report-template fields for `Description`, `Impact`, `Recommendation`, and `CVSSv4 Vector`; deterministic correlation populates the first three fields, and reports render them when present.
+- Scan runs now track basic completeness metadata: discovered hosts, successfully scanned hosts, failed hosts, scan arguments used per host, and run notes. Reports include a `Scan Completeness` section.
+- The full unittest suite now runs without missing fixture-file errors by making plugin-validator tests self-contained.
+- DNS and TLS/HTTPS safe-analysis plugins were added after reviewing `PR00000`; `PR00001` confirmed they produce evidence, and DNS recursion evidence is now promoted into a deterministic finding.
+- Report rendering now strips control characters from service/plugin output so binary-ish banners do not make markdown reports unreadable to text tooling.
+- Reports now write `findings.csv` and `open_services.csv` beside `report.md` for spreadsheet review and client-facing appendices.
+
 ## Live Localhost Flow Evidence
 
 A controlled run was performed with `scope.txt` containing only `127.0.0.1` and project output in `PR_LOCALHOST`.
@@ -64,7 +289,25 @@ A full staged rebuild (see `docs/DESIGN.md` "Current Architecture") resolved the
 - **#21** Reporting quality improved: a ranked "Top Findings" section (deterministic cross-host correlation, optional AI narrative) now leads the report, ahead of per-host detail; CVE matches are rendered as a factual table separate from AI recommendations; preflight-vs-active-scan discrepancies are called out only when they occur.
 - **#22** SMB upload confirmation logic carried through unchanged into the new `ProjectContext`-based `PreFlight`.
 
-Not yet addressed (tracked, out of scope for this pass): #12 (web scope is still preflight/report-only, no active HTTP probing phase), #20 (no dedicated `--dry-run` flag), #23 (no additional structured logging beyond the per-project `sift.log` now produced via `setup_logging`).
+Not yet addressed (tracked, out of scope for this pass): #20 (no dedicated `--dry-run` flag), #23 (no additional structured logging beyond the per-project `sift.log` now produced via `setup_logging`).
+
+## Implemented in the 2026-07-04 Pass (Webhooks + Active Web Probing)
+
+- **Priority 6 (Webhooks)** — Added an opt-in, local-only `WebhookConfig` (`utils/config.py`) and `WebhookNotifier` (`utils/webhooks.py`), configured via a new `<Webhook>` block in `settings.example.xml`. Events wired into the real run so far: `run_start`, `run_complete`, `high_severity_finding` (critical/high correlation findings), and `scan_failure` (per failed host from `ScanCompleteness.failed_hosts`). `confirmed_finding` and `approval_required` are deliberately not implemented yet — there is no Nessus-style confirmation workflow or runtime auto-plugin-generation call site to hang them off; adding those events now would have no real trigger.
+- **#12 (Web scope)** — `web_scope.txt` is no longer preflight/report-only. `PreFlight.get_web_targets()` reads it, and `Scanner.scan_web_targets()` parses each URL's scheme/host/port and runs `http_scan`/`tls_scan` directly against it (no nmap discovery needed since the scheme is already explicit). Results merge into the same `ScanRun.hosts` dict as network targets, so they get CVE matching skip (no version data), correlation, CSV export, and markdown rendering for free. A new deterministic correlation detector, `detect_missing_security_headers`, promotes the plugins' `missing_security_headers` evidence into a `low`-severity finding when a response was actually observed (errors are excluded).
+- `sift.py`'s Step 3 now treats network recon and web probing as independent: missing scan dependencies or a "no" to the recon prompt only skips the network portion, it no longer short-circuits web probing (or vice versa).
+- Reporter's "Host Artifacts" section used to guess a `Scan-Data/<host>/nmap.csv` link whenever a host had no recorded artifacts (a leftover pre-artifact-refactor fallback); this broke for web-only hosts, which never save that file. Fixed to only render real, saved artifacts.
+
+## Verified Against a Real Run (PR00004, 2026-07-05)
+
+A full `--auto` run against real devices on the local network (two Dropbear-based routers plus `example.com` from `web_scope.txt`) surfaced two pre-existing bugs, now fixed:
+
+- **Duplicate artifacts on escalated hosts** — `Scanner._merge_host_result` used `list.extend()` for both host- and port-level artifacts, so a host that got quick-scanned then adaptively escalated had every artifact (nmap CSV, plugin output, banners) listed twice in the report and `open_services.csv`. Fixed via a new `Scanner._merge_artifacts` helper that dedupes by `Artifact.path` before appending.
+- **Raw SSH KEX data leaking into text fields** — `ssh_scan`'s `recv(1024)` after connecting often also captured the start of the binary KEXINIT packet that follows the identification line, and that garbled binary blob then flowed into `escalate_reason`, the report's host heading, and CSV cells. Fixed by keeping only the first line of the response (the actual RFC 4253 identification string).
+
+Also observed, not a code bug: nmap's unprivileged `-sn` host discovery reported 256/256 addresses "up" on a `/24` where the project's own lightweight preflight sweep found only 1/254 truly responsive — a known limitation of ICMP/ARP-less discovery without root. Running nmap with root or `setcap cap_net_raw` would fix discovery accuracy and avoid burning AI-analysis time on phantom hosts.
+
+A re-run (PR00005) confirmed both fixes above, but surfaced a third, related bug: `Scanner.scan_host`/`scan_web_targets` saved every port's plugin output to `{plugin.name}_output.json`/`{plugin.name}_banner.txt` with no port in the filename, so a host with the same plugin running on multiple ports (e.g. `http_scan` on 80 and 8080) had each port silently overwrite the previous port's evidence file on disk, while the report still linked to it from every port as if it were preserved. Fixed by including the port number in the filename (`http_scan_80_output.json`, `http_scan_8080_output.json`, etc.), verified against the same real routers.
 
 ## P0 - Correctness and Run-Stopping Issues
 

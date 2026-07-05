@@ -19,10 +19,10 @@ class AIClient:
             return bool(self.config.openai_api_key and "apikey" not in self.config.openai_api_key.lower())
         return self._check_ollama()
 
-    def chat(self, system_prompt: str, user_prompt: str) -> str:
+    def chat(self, system_prompt: str, user_prompt: str, use_report_model: bool = False) -> str:
         if self.config.provider == "openai":
-            return self._openai_chat(system_prompt, user_prompt)
-        return self._ollama_chat(system_prompt, user_prompt)
+            return self._openai_chat(system_prompt, user_prompt, use_report_model=use_report_model)
+        return self._ollama_chat(system_prompt, user_prompt, use_report_model=use_report_model)
 
     def _check_ollama(self) -> bool:
         host = self.config.ollama_host
@@ -38,9 +38,9 @@ class AIClient:
         print_status("[-] Ollama does not appear to be running correctly.", "error")
         return False
 
-    def _ollama_chat(self, system_prompt: str, user_prompt: str) -> str:
+    def _ollama_chat(self, system_prompt: str, user_prompt: str, use_report_model: bool = False) -> str:
         host = self.config.ollama_host.replace("http://", "").replace("https://", "")
-        model = self.config.ollama_model
+        model = self.config.ollama_report_model if use_report_model else self.config.ollama_model
         url = f"http://{host}/api/chat"
 
         payload = {
@@ -73,7 +73,7 @@ class AIClient:
             print_status(f"[!] Ollama streaming request failed: {e}", "error")
             return "⚠️ Ollama Error: Failed to connect to Ollama. Please check that Ollama is downloaded, running and accessible."
 
-    def _openai_chat(self, system_prompt: str, user_prompt: str) -> str:
+    def _openai_chat(self, system_prompt: str, user_prompt: str, use_report_model: bool = False) -> str:
         try:
             from openai import OpenAI
         except ImportError:
@@ -88,7 +88,7 @@ class AIClient:
         client = OpenAI(api_key=api_key)
         try:
             response = client.chat.completions.create(
-                model=self.config.openai_model,
+                model=self.config.openai_report_model if use_report_model else self.config.openai_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},

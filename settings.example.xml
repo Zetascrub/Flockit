@@ -6,13 +6,15 @@
     <ExternalIPURL>https://api.ipify.org</ExternalIPURL>
     <OutputFormat>XML</OutputFormat>
 
-    <!-- AI provider used for per-port analysis, plugin generation, and finding narration -->
+    <!-- AI provider. OllamaModel is the fast/default model; OllamaReportModel is used for final finding/report narration. -->
     <DefaultAIProvider>ollama</DefaultAIProvider>
     <OllamaHost>localhost</OllamaHost>
-    <OllamaModel>llama3.2</OllamaModel>
+    <OllamaModel>qwen3:8b</OllamaModel>
+    <OllamaReportModel>qwen3:14b</OllamaReportModel>
     <OpenAI>
         <APIKey>YOUR_OPENAI_API_KEY</APIKey>
         <Model>gpt-4</Model>
+        <ReportModel>gpt-4</ReportModel>
     </OpenAI>
 
     <!-- CVE matching (NVD CVE API 2.0) -->
@@ -42,6 +44,19 @@
         <Share>Share</Share>
         <Username>USERNAME</Username>
     </SMB>
+
+    <!-- Optional, opt-in outbound notifications. Disabled unless Enabled is true and URL is set. -->
+    <Webhook>
+        <Enabled>false</Enabled>
+        <URL>https://example.com/webhooks/sift</URL>
+        <Timeout>5</Timeout>
+        <Events>
+            <Event>run_start</Event>
+            <Event>run_complete</Event>
+            <Event>high_severity_finding</Event>
+            <Event>scan_failure</Event>
+        </Events>
+    </Webhook>
 
     <ValidExternalRanges>
         <Range>203.0.113.0/28</Range>

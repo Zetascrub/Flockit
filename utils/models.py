@@ -56,12 +56,22 @@ class HostResult:
 
 
 @dataclass
+class ScanCompleteness:
+    discovered_hosts: List[str] = field(default_factory=list)
+    scanned_hosts: List[str] = field(default_factory=list)
+    failed_hosts: Dict[str, str] = field(default_factory=dict)
+    scan_arguments_by_host: Dict[str, List[str]] = field(default_factory=dict)
+    notes: List[str] = field(default_factory=list)
+
+
+@dataclass
 class ScanRun:
     hosts: Dict[str, HostResult] = field(default_factory=dict)
     targets: List[str] = field(default_factory=list)
     mode: str = "quick"
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
+    completeness: ScanCompleteness = field(default_factory=ScanCompleteness)
 
 
 @dataclass
@@ -70,6 +80,10 @@ class Finding:
     title: str
     severity: str  # critical|high|medium|low|info
     category: str  # "repeated-cve" | "same-vulnerable-version" | "service-overexposure" | "credential-weakness"
+    description: Optional[str] = None
+    impact: Optional[str] = None
+    recommendation: Optional[str] = None
+    cvss_vector: Optional[str] = None
     affected_hosts: List[str] = field(default_factory=list)
     evidence: List[str] = field(default_factory=list)
     cve_ids: List[str] = field(default_factory=list)

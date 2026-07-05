@@ -297,6 +297,16 @@ class PreFlight:
                     recon_targets += [line.strip() for line in f if line.strip()]
         return " ".join(recon_targets)
 
+    def get_web_targets(self):
+        """Returns the web_scope.txt URLs for active HTTP/TLS probing
+        (see Scanner.scan_web_targets). Each entry already carries an
+        explicit scheme, so no nmap discovery is needed for these targets."""
+        full_path = os.path.join(self.project_folder, "web_scope.txt")
+        if not os.path.exists(full_path):
+            return []
+        with open(full_path, "r") as f:
+            return [line.strip() for line in f if line.strip()]
+
     def prompt_recon(self):
         print_banner("Active Scanning Phase")
         return prompt_yes_no("Do you want to perform active testing? (y/n): ", self.ctx.config.automation.general)
