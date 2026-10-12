@@ -35,7 +35,15 @@ def _sanitize_json_value(value):
 
 # --- Generates markdown/PDF reports from typed scan results ---
 class Reporter:
-    def __init__(self, ctx: ProjectContext, scan_run: ScanRun, output_path: str, findings=None, pdf_mode: bool = False):
+    def __init__(
+        self,
+        ctx: ProjectContext,
+        scan_run: ScanRun,
+        output_path: str,
+        findings=None,
+        pdf_mode: bool = False,
+        prompt_to_view: bool = True,
+    ):
         self.ctx = ctx
         self.scan_run = scan_run
         self.results = scan_run.hosts  # host -> HostResult
@@ -43,6 +51,7 @@ class Reporter:
         self.project_dir = os.path.dirname(output_path)
         self.findings = findings or []
         self.pdf_mode = pdf_mode
+        self.prompt_to_view = prompt_to_view
 
     def generate_report(self):
         print_status("[+] Generating report...", "info")
@@ -136,8 +145,7 @@ class Reporter:
         print_status(f"[+] Report saved to {self.output_path}", "success")
         self.export_csv()
 
-        choice = prompt_yes_no("Do you want to see the report? (y/n): ", self.ctx.config.automation.view_report)
-        if choice:
+        if self.prompt_to_view and prompt_yes_no("Do you want to see the report? (y/n): ", self.ctx.config.automation.view_report):
             print("\n" + "=" * 60 + "\nREPORT OUTPUT:\n" + "=" * 60)
             print(report_md)
 

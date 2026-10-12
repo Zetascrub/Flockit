@@ -241,6 +241,178 @@ def detect_dns_recursion(hosts: Dict[str, HostResult], cfg: AdaptiveScanConfig) 
     )]
 
 
+def detect_dns_cache_snooping(hosts: Dict[str, HostResult], cfg: AdaptiveScanConfig) -> List[Finding]:
+    hits = []
+    for host, hr in hosts.items():
+        for pr in hr.ports:
+            result = pr.plugin_results.get("dns_scan")
+            if not isinstance(result, dict):
+                continue
+            check = result.get("cache_snoop_check")
+            if isinstance(check, dict) and check.get("answer_count", 0) > 0:
+                hits.append((host, pr.port, check))
+
+    if not hits:
+        return []
+
+    affected = sorted({host for host, _, _ in hits})
+    return [Finding(
+        id="dns-cache-snooping-possible",
+        title=f"DNS cache snooping appears possible on {len(affected)} host(s)",
+        severity="medium",
+        category="dns-cache-snooping",
+        description=(
+            "The DNS service answered a non-recursive query for a third-party domain, which can indicate "
+            "that cache snooping is possible from the scan source network."
+        ),
+        impact=(
+            "A client on the same reachable network may infer recently resolved domains and learn browsing, "
+            "service, or partner-usage patterns."
+        ),
+        recommendation=(
+            "Restrict resolver access to trusted clients and configure DNS servers to avoid answering "
+            "non-recursive cache queries from untrusted networks."
+        ),
+        affected_hosts=affected,
+        evidence=[f"{host}:{port} answers={check.get('answer_count')} rcode={check.get('rcode')}" for host, port, check in hits],
+    )]
+
+
+def detect_smb_weaknesses(hosts: Dict[str, HostResult], cfg: AdaptiveScanConfig) -> List[Finding]:
+    signing_hits = []
+    anonymous_hits = []
+    for host, hr in hosts.items():
+        for pr in hr.ports:
+            result = pr.plugin_results.get("smb_scan")
+            if not isinstance(result, dict):
+                continue
+            if result.get("smb_signing_not_required") or result.get("smb_signing_required") is False:
+                signing_hits.append((host, pr.port))
+            if result.get("null_session") or result.get("anonymous_login"):
+                anonymous_hits.append((host, pr.port, result.get("shares") or []))
+
+    findings = []
+    if signing_hits:
+        affected = sorted({host for host, _ in signing_hits})
+        findings.append(Finding(
+            id="smb-signing-not-required",
+            title=f"SMB signing is not required on {len(affected)} host(s)",
+            severity="medium",
+            category="smb-signing",
+            description="The SMB service does not require message signing.",
+            impact=(
+                "Unsigned SMB traffic may be susceptible to relay or tampering attacks when an attacker can "
+                "position themselves on the network path."
+            ),
+            recommendation="Require SMB signing where supported and validate compatibility with legacy clients.",
+            affected_hosts=affected,
+            evidence=[f"{host}:{port}" for host, port in signing_hits],
+        ))
+    if anonymous_hits:
+        affected = sorted({host for host, _, _ in anonymous_hits})
+        findings.append(Finding(
+            id="smb-anonymous-access",
+            title=f"SMB anonymous/null-session access on {len(affected)} host(s)",
+            severity="high",
+            category="credential-weakness",
+            description="The SMB service allowed anonymous authentication or null-session share enumeration.",
+            impact="Anonymous SMB access can expose share names, files, or writeable locations without credentials.",
+            recommendation="Disable anonymous SMB access and restrict share permissions to authenticated principals.",
+            affected_hosts=affected,
+            evidence=[f"{host}:{port} shares={', '.join(shares) if shares else '(none listed)'}" for host, port, shares in anonymous_hits],
+        ))
+    return findings
+
+
+def detect_ssh_weak_algorithms(hosts: Dict[str, HostResult], cfg: AdaptiveScanConfig) -> List[Finding]:
+    hits = []
+    for host, hr in hosts.items():
+        for pr in hr.ports:
+            result = pr.plugin_results.get("ssh_scan")
+            if isinstance(result, dict) and result.get("weak_algorithms"):
+                hits.append((host, pr.port, result["weak_algorithms"]))
+
+    if not hits:
+        return []
+
+    affected = sorted({host for host, _, _ in hits})
+    return [Finding(
+        id="ssh-weak-algorithms",
+        title=f"SSH weak algorithms supported on {len(affected)} host(s)",
+        severity="medium",
+        category="ssh-weak-algorithms",
+        description="The SSH service advertised one or more legacy cryptographic algorithms.",
+        impact="Legacy SSH algorithms can weaken confidentiality or integrity and may violate hardening baselines.",
+        recommendation=(
+            "Disable SHA-1 based key exchange/MACs, CBC ciphers, 3DES, DSA, and RSA-SHA1 host key algorithms "
+            "where client compatibility allows."
+        ),
+        affected_hosts=affected,
+        evidence=[f"{host}:{port} weak={weak}" for host, port, weak in hits],
+    )]
+
+
+def detect_tls_weaknesses(hosts: Dict[str, HostResult], cfg: AdaptiveScanConfig) -> List[Finding]:
+    legacy_hits = []
+    weak_cipher_hits = []
+    cert_hits = []
+    for host, hr in hosts.items():
+        for pr in hr.ports:
+            result = pr.plugin_results.get("tls_scan")
+            if not isinstance(result, dict):
+                continue
+            if result.get("legacy_protocols_supported"):
+                legacy_hits.append((host, pr.port, result["legacy_protocols_supported"]))
+            if result.get("weak_ciphers_supported"):
+                weak_cipher_hits.append((host, pr.port, result["weak_ciphers_supported"]))
+            cert_warnings = result.get("certificate_warnings") or []
+            meaningful_warnings = [w for w in cert_warnings if w != "certificate_not_present"]
+            if meaningful_warnings:
+                cert_hits.append((host, pr.port, sorted(set(meaningful_warnings))))
+
+    findings = []
+    if legacy_hits:
+        affected = sorted({host for host, _, _ in legacy_hits})
+        findings.append(Finding(
+            id="tls-legacy-protocols",
+            title=f"Legacy TLS protocols supported on {len(affected)} host(s)",
+            severity="medium",
+            category="tls-configuration",
+            description="One or more TLS services accepted TLS 1.0 and/or TLS 1.1 handshakes.",
+            impact="Legacy TLS protocols are deprecated and can expose services to downgrade or cryptographic attacks.",
+            recommendation="Disable TLS 1.0 and TLS 1.1, leaving TLS 1.2 and TLS 1.3 enabled where possible.",
+            affected_hosts=affected,
+            evidence=[f"{host}:{port} protocols={', '.join(protocols)}" for host, port, protocols in legacy_hits],
+        ))
+    if weak_cipher_hits:
+        affected = sorted({host for host, _, _ in weak_cipher_hits})
+        findings.append(Finding(
+            id="tls-weak-ciphers",
+            title=f"Weak TLS ciphers supported on {len(affected)} host(s)",
+            severity="high",
+            category="tls-configuration",
+            description="One or more TLS services accepted a handshake constrained to weak cipher families.",
+            impact="Weak TLS ciphers such as 3DES or CBC-mode suites can reduce transport confidentiality.",
+            recommendation="Disable 3DES and CBC-mode cipher suites and prefer modern AEAD suites.",
+            affected_hosts=affected,
+            evidence=[f"{host}:{port} weak_ciphers={', '.join(ciphers)}" for host, port, ciphers in weak_cipher_hits],
+        ))
+    if cert_hits:
+        affected = sorted({host for host, _, _ in cert_hits})
+        findings.append(Finding(
+            id="tls-certificate-issues",
+            title=f"TLS certificate issues on {len(affected)} host(s)",
+            severity="medium",
+            category="tls-certificate",
+            description="TLS certificate validation checks found trust, hostname, expiry, or self-signed certificate issues.",
+            impact="Certificate problems can break trust validation and increase exposure to impersonation or interception.",
+            recommendation="Install certificates issued by a trusted CA with valid names, key usage, and expiry dates.",
+            affected_hosts=affected,
+            evidence=[f"{host}:{port} warnings={', '.join(warnings)}" for host, port, warnings in cert_hits],
+        ))
+    return findings
+
+
 def detect_missing_security_headers(hosts: Dict[str, HostResult], cfg: AdaptiveScanConfig) -> List[Finding]:
     """Promotes http_scan/tls_scan missing_security_headers evidence (from
     active web probing, see Scanner.scan_web_targets) into a finding when a
@@ -288,6 +460,10 @@ DETECTORS: List[Callable[[Dict[str, HostResult], AdaptiveScanConfig], List[Findi
     detect_service_overexposure,
     detect_credential_weakness,
     detect_dns_recursion,
+    detect_dns_cache_snooping,
+    detect_smb_weaknesses,
+    detect_ssh_weak_algorithms,
+    detect_tls_weaknesses,
     detect_missing_security_headers,
 ]
 

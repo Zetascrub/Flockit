@@ -109,6 +109,66 @@ class CorrelationTests(unittest.TestCase):
         self.assertIn("recursion", dns_findings[0].description.lower())
         self.assertIn("Restrict recursive DNS", dns_findings[0].recommendation)
 
+    def test_dns_cache_snooping_detected_from_plugin_output(self):
+        pr = PortResult(port=53, service="domain")
+        pr.plugin_results["dns_scan"] = {"cache_snoop_check": {"answer_count": 2, "rcode": 0}}
+
+        scan_run = ScanRun(hosts={"10.0.0.10": HostResult(host="10.0.0.10", ports=[pr])})
+
+        findings = correlation.correlate(scan_run, self.cfg)
+        snooping = [f for f in findings if f.category == "dns-cache-snooping"]
+
+        self.assertEqual(len(snooping), 1)
+        self.assertEqual(snooping[0].affected_hosts, ["10.0.0.10"])
+        self.assertIn("non-recursive", snooping[0].description)
+
+    def test_smb_weaknesses_detected_from_plugin_output(self):
+        pr = PortResult(port=445, service="smb")
+        pr.plugin_results["smb_scan"] = {
+            "smb_signing_required": False,
+            "null_session": True,
+            "shares": ["Media"],
+        }
+
+        scan_run = ScanRun(hosts={"10.0.0.20": HostResult(host="10.0.0.20", ports=[pr])})
+
+        findings = correlation.correlate(scan_run, self.cfg)
+
+        self.assertEqual([f.category for f in findings if f.id == "smb-signing-not-required"], ["smb-signing"])
+        anonymous = [f for f in findings if f.id == "smb-anonymous-access"]
+        self.assertEqual(len(anonymous), 1)
+        self.assertIn("Media", anonymous[0].evidence[0])
+
+    def test_ssh_weak_algorithms_detected_from_plugin_output(self):
+        pr = PortResult(port=22, service="ssh")
+        pr.plugin_results["ssh_scan"] = {"weak_algorithms": {"kex": ["diffie-hellman-group14-sha1"]}}
+
+        scan_run = ScanRun(hosts={"10.0.0.30": HostResult(host="10.0.0.30", ports=[pr])})
+
+        findings = correlation.correlate(scan_run, self.cfg)
+        ssh_findings = [f for f in findings if f.category == "ssh-weak-algorithms"]
+
+        self.assertEqual(len(ssh_findings), 1)
+        self.assertIn("diffie-hellman-group14-sha1", ssh_findings[0].evidence[0])
+
+    def test_tls_weaknesses_detected_from_plugin_output(self):
+        pr = PortResult(port=443, service="https")
+        pr.plugin_results["tls_scan"] = {
+            "legacy_protocols_supported": ["TLSv1", "TLSv1.1"],
+            "weak_ciphers_supported": ["3des"],
+            "certificate_warnings": ["self_signed_certificate", "hostname_mismatch"],
+        }
+
+        scan_run = ScanRun(hosts={"10.0.0.40": HostResult(host="10.0.0.40", ports=[pr])})
+
+        findings = correlation.correlate(scan_run, self.cfg)
+
+        self.assertEqual([f.id for f in findings if f.id == "tls-legacy-protocols"], ["tls-legacy-protocols"])
+        self.assertEqual([f.id for f in findings if f.id == "tls-weak-ciphers"], ["tls-weak-ciphers"])
+        cert_findings = [f for f in findings if f.id == "tls-certificate-issues"]
+        self.assertEqual(len(cert_findings), 1)
+        self.assertIn("self_signed_certificate", cert_findings[0].evidence[0])
+
     def test_missing_security_headers_detected_from_web_plugin_output(self):
         pr_a = PortResult(port=80, service="http")
         pr_a.plugin_results["http_scan"] = {

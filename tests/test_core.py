@@ -477,6 +477,9 @@ class PluginTests(unittest.TestCase):
                     b"\x00\x00\x01\x14\x0a\x14curve25519-sha256,ecdh-sha2-nistp521\x00binary-kex-garbage"
                 )
 
+            def sendall(self, data):
+                self.sent = data
+
         plugin = SSHScan()
         with patch("socket.create_connection", return_value=FakeSocket()):
             result = plugin.run("10.0.0.1", 22, {"service": "ssh"})

@@ -168,6 +168,16 @@ python3 sift.py plugins approve <filename> [--yes]
 python3 sift.py plugins reject <filename>
 ```
 
+### 🟪 Nessus Import
+
+Sift can import a Nessus `.nessus` XML export into its typed result model and generate a Sift-style markdown/CSV report. This is useful for comparing Sift's own active findings against a Nessus Professional LAN scan:
+
+```bash
+python3 sift.py nessus import PR00100/lan_scan.nessus --project PR00100 --output nessus_import_report.md
+```
+
+Each Nessus `ReportItem` is preserved under `plugin_results` as `nessus_<pluginID>`, with CVEs, CVSS, risk, solution, plugin output, CPE, family, and publication dates carried into the report where present.
+
 ---
 
 ## Demo

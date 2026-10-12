@@ -16,9 +16,10 @@ def _encode_name(name):
     return encoded + b"\x00"
 
 
-def _query(host, name, qtype=1, qclass=1, timeout=3):
+def _query(host, name, qtype=1, qclass=1, timeout=3, recursion_desired=True):
     query_id = random.randint(0, 65535)
-    header = struct.pack("!HHHHHH", query_id, 0x0100, 1, 0, 0, 0)
+    flags = 0x0100 if recursion_desired else 0x0000
+    header = struct.pack("!HHHHHH", query_id, flags, 1, 0, 0, 0)
     question = _encode_name(name) + struct.pack("!HH", qtype, qclass)
     packet = header + question
 
@@ -34,6 +35,7 @@ def _query(host, name, qtype=1, qclass=1, timeout=3):
     return {
         "query_id_matches": resp_id == query_id,
         "rcode": flags & 0x000F,
+        "recursion_desired": recursion_desired,
         "recursion_available": bool(flags & 0x0080),
         "authoritative": bool(flags & 0x0400),
         "question_count": qdcount,
@@ -56,6 +58,7 @@ class DNSScan(ScanPlugin):
         result = {
             "tcp_connect": False,
             "recursion_check": None,
+            "cache_snoop_check": None,
             "version_bind_check": None,
         }
 
@@ -72,6 +75,15 @@ class DNSScan(ScanPlugin):
                 result["escalate_reason"] = f"DNS recursion appears available on {host}:{port}"
         except Exception as e:
             result["recursion_error"] = str(e)
+
+        try:
+            result["cache_snoop_check"] = _query(host, "example.edu", qtype=1, qclass=1, recursion_desired=False)
+            if result["cache_snoop_check"].get("answer_count", 0) > 0:
+                result["cache_snooping_possible"] = True
+                result["escalate"] = True
+                result["escalate_reason"] = f"DNS cache snooping appears possible on {host}:{port}"
+        except Exception as e:
+            result["cache_snoop_error"] = str(e)
 
         try:
             result["version_bind_check"] = _query(host, "version.bind", qtype=16, qclass=3)

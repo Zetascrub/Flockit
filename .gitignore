@@ -14,3 +14,8 @@ Plugin_Dev/*
 modules/plugins/ai-gen*
 modules/plugins_quarantine/*
 .venv/
+
+# Local scan data / downloads (not for the repo)
+*.nessus
+NESSUS_LAN_IMPORT/
+all-2.0.tar.gz

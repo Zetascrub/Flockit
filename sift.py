@@ -6,6 +6,7 @@ import sys
 
 from modules import correlation, plugin_manager
 from modules.cve_lookup import CVECache, CVELookupClient
+from modules.nessus_import import findings_from_nessus, parse_nessus_file
 from modules.reporter import Reporter
 from modules.preflight import PreFlight
 from modules.scanner import Scanner
@@ -69,6 +70,29 @@ def handle_plugins_command(args):
         print_status("Usage: sift.py plugins {list,show,approve,reject}", "warning")
 
 
+def handle_nessus_command(args):
+    if args.nessus_command != "import":
+        print_status("Usage: sift.py nessus import <file.nessus>", "warning")
+        return
+
+    settings_path = args.settings if args.settings else "settings_dev.xml"
+    config = Config.load(settings_path, args)
+    project_id = args.project or "NESSUS_IMPORT"
+    ctx = ProjectContext.create(project_id, args.scope, config)
+
+    scan_run = parse_nessus_file(args.nessus_file)
+    findings = findings_from_nessus(scan_run, minimum_severity=args.minimum_severity)
+    print_status(
+        f"[+] Imported Nessus scan: {len(scan_run.hosts)} host(s), "
+        f"{sum(len(hr.ports) for hr in scan_run.hosts.values())} port bucket(s), "
+        f"{len(findings)} finding(s).",
+        "success",
+    )
+
+    report_path = os.path.join(ctx.project_folder, args.output)
+    Reporter(ctx, scan_run, report_path, findings=findings, prompt_to_view=args.view_report).generate_report()
+
+
 def flock():
     parser = argparse.ArgumentParser(description="Sift: Adaptive Penetration Testing Framework")
     parser.add_argument("--settings", help="Path to an XML file for custom settings")
@@ -114,10 +138,27 @@ def flock():
     reject_p = plugins_sub.add_parser("reject", help="Reject a quarantined plugin, moving it to plugins_quarantine/rejected")
     reject_p.add_argument("filename")
 
+    nessus_parser = subparsers.add_parser("nessus", help="Import and report on Nessus .nessus XML results")
+    nessus_sub = nessus_parser.add_subparsers(dest="nessus_command")
+    nessus_import_p = nessus_sub.add_parser("import", help="Import a .nessus file into a Sift-style report")
+    nessus_import_p.add_argument("nessus_file")
+    nessus_import_p.add_argument("--project", default="NESSUS_IMPORT", help="Project folder for imported output")
+    nessus_import_p.add_argument("--output", default="nessus_import_report.md", help="Imported report filename")
+    nessus_import_p.add_argument(
+        "--minimum-severity",
+        choices=["critical", "high", "medium", "low", "info"],
+        default="medium",
+        help="Minimum Nessus severity to promote into Top Findings",
+    )
+    nessus_import_p.add_argument("--view-report", action="store_true", help="Print the generated import report")
+
     args = parser.parse_args()
 
     if args.command == "plugins":
         handle_plugins_command(args)
+        return
+    if args.command == "nessus":
+        handle_nessus_command(args)
         return
 
     print_banner("Sift: Adaptive Pentest Framework")
